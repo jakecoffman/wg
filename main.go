@@ -14,8 +14,8 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	http.Handle("/", http.FileServer(http.Dir(".")))
-	http.Handle("/ws", websocket.Handler(wsHandler))
+	http.Handle("/setgame/", http.StripPrefix("/setgame", http.FileServer(http.Dir("./setgame"))))
+	http.Handle("/setgame/ws", websocket.Handler(wsHandler))
 	log.Fatal(http.ListenAndServe("0.0.0.0:8222", nil))
 }
 

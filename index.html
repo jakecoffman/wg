@@ -70,7 +70,13 @@
     </div>
 </div>
 <script>
-    var url = 'ws://' + location.host + '/ws';
+    var url;
+    if (location.protocol === 'https:') {
+        url = 'wss://';
+    } else {
+        url = 'ws://';
+    }
+    url += + location.host + location.pathname + '/ws';
     var ws = new WebSocket(url);
 
     var nut = document.getElementById('nut');

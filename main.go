@@ -108,6 +108,9 @@ func wsHandler(ws *websocket.Conn) {
 }
 
 func isSet(card1, card2, card3 Card) bool {
+	if card1.Amount == -1 || card2.Amount == -1 || card3.Amount == -1 {
+		return false
+	}
 	if !(same(card1.Shape, card2.Shape, card3.Shape) || different(card1.Shape, card2.Shape, card3.Shape)) {
 		return false
 	}
@@ -124,30 +127,18 @@ func isSet(card1, card2, card3 Card) bool {
 }
 
 func same(s1, s2, s3 string) bool {
-	if s3 == "" {
-		return false
-	}
 	return s1 == s2 && s2 == s3 && s3 != ""
 }
 
 func different(s1, s2, s3 string) bool {
-	if s3 == "" {
-		return false
-	}
 	return s1 != s2 && s2 != s3 && s3 != s1
 }
 
 func sameInt(s1, s2, s3 int) bool {
-	if s3 == -1 {
-		return false
-	}
 	return s1 == s2 && s2 == s3
 }
 
 func differentInt(s1, s2, s3 int) bool {
-	if s3 == -1 {
-		return false
-	}
 	return s1 != s2 && s2 != s3 && s3 != s1
 }
 
@@ -270,6 +261,7 @@ func (g *Game) dealmore() {
 	if g.cursor == len(g.rands) {
 		log.Println("Restarting game")
 		g.reset()
+		g.sendEveryoneEverything()
 		return
 	}
 

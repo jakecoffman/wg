@@ -14,20 +14,9 @@
             flex-direction: row;
             justify-content: center;
         }
-        #info {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-        }
     </style>
 </head>
 <body>
-<div id="info">
-    <p>Game ID: <span id="gameId"></span>
-    <p>Players: <span id="players"></span>
-    <p><button id="nosets" class="pure-button pure-button-primary">No sets</button>
-</div>
-
 <div id="cards">
     <div class="row">
         <span id="0,0"></span>
@@ -54,6 +43,12 @@
         <span id="1,4"></span>
         <span id="2,4"></span>
     </div>
+</div>
+
+<div id="info">
+    <p>Game ID: <span id="gameId"></span>
+    <p>Players: <span id="players"></span>
+    <p><button id="nosets" class="pure-button pure-button-primary">No sets</button>
 </div>
 
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg">

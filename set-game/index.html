@@ -188,9 +188,9 @@
                     } else {
                         // create it if it doesn't exist
                         node = cards.appendChild(document.createElement('span'));
-                        node.setAttribute('id', i);
-                        addEventListeners(i, node);
-                        map[i] = node;
+                        node.setAttribute('id', update.location);
+                        addEventListeners(update.location, node);
+                        map[update.location] = node;
                     }
                     var shape;
                     switch (update.card.shape) {

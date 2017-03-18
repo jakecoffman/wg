@@ -18,6 +18,7 @@ func init() {
 		time.Sleep(1 * time.Minute)
 		for id, game := range games {
 			if game.NumConns() == 0 {
+				game.Stop <- struct{}{}
 				delete(games, id)
 			}
 		}

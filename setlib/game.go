@@ -1,7 +1,6 @@
 package setlib
 
 import (
-	"time"
 	"math/rand"
 	"log"
 	"golang.org/x/net/websocket"
@@ -15,6 +14,7 @@ type Game struct {
 	Leave chan *websocket.Conn
 	Play  chan []int
 	NoSets chan struct{}
+	Stop chan struct{}
 
 	Id string
 	board map[int]Card
@@ -28,6 +28,7 @@ func NewGame(id string) *Game {
 		Leave: make(chan *websocket.Conn),
 		Play: make(chan []int),
 		NoSets: make(chan struct{}),
+		Stop: make(chan struct{}),
 
 		conns: make(map[*websocket.Conn]bool),
 		board: map[int]Card{},
@@ -39,7 +40,6 @@ func NewGame(id string) *Game {
 }
 
 func (g *Game) run() {
-	gameTimeout := time.NewTimer(1 * time.Minute)
 	for {
 		select {
 		case c := <-g.Join:
@@ -56,14 +56,8 @@ func (g *Game) run() {
 			g.playone(read)
 		case <- g.NoSets:
 			g.dealmore()
-		case <- gameTimeout.C:
-			if len(g.conns) == 0 {
-				return
-			}
-			if !gameTimeout.Stop() {
-				<-gameTimeout.C
-			}
-			gameTimeout.Reset(time.Hour)
+		case <- g.Stop:
+			return
 		}
 	}
 }

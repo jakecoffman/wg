@@ -129,14 +129,20 @@
   map['2,4'] = document.getElementById('2,4');
 
   var selected = [];
-
+  var wasJustMoving = false;
   for (var loc in map) {
     map[loc].addEventListener('touchend', selectHandler(loc, map[loc]));
+    map[loc].addEventListener('touchmove', function() { wasJustMoving = true; });
     map[loc].addEventListener('click', selectHandler(loc, map[loc]));
   }
 
   function selectHandler(location, node) {
     return function(event) {
+      // prevent dragging causing selection
+      if (wasJustMoving) {
+          wasJustMoving = false;
+          return;
+      }
       event.stopPropagation();
       event.preventDefault();
       if (event.handled === true) {

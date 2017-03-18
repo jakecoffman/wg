@@ -236,7 +236,7 @@ func (g Game) findSets() [][]int {
 	return sets
 }
 
-func (g Game) NumConns() int {
+func (g *Game) NumConns() int {
 	return len(g.conns)
 }
 

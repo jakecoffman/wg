@@ -644,7 +644,7 @@
     }
 }
 .card {
-    --width: 60px;
+    --width: 70px;
     width: var(--width);
     height: calc(var(--width) * 1.5);
     background: #fff;
@@ -666,7 +666,7 @@
     cursor: pointer;
     -webkit-transition: -webkit-transform 0.2s ease-in-out;
     transition: transform 0.2s ease-in-out;
-    margin: 1%;
+    margin: 10px;
 }
 .card.animate-in {
     -webkit-animation: bounceIn 1s both linear;

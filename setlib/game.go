@@ -236,6 +236,10 @@ func (g Game) findSets() [][]int {
 	return sets
 }
 
+func (g Game) NumConns() int {
+	return len(g.conns)
+}
+
 type UpdateMsg struct {
 	Type    string   `json:"type"`
 	Updates []Update `json:"updates"`

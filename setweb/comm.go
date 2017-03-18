@@ -4,6 +4,8 @@ import (
 	"golang.org/x/net/websocket"
 	"github.com/jakecoffman/set-game/setlib"
 	"math/rand"
+	"net/http"
+	"encoding/json"
 )
 
 // technically not thread-safe
@@ -60,6 +62,14 @@ func WsHandler(ws *websocket.Conn) {
 			}
 		}
 	}
+}
+
+func Admin(w http.ResponseWriter, r *http.Request) {
+	response := map[string]int{}
+	for id, game := range games {
+		response[id] = game.NumConns()
+	}
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 const letterBytes = "1234567890"

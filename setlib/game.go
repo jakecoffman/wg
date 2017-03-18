@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"log"
 	"golang.org/x/net/websocket"
+	"fmt"
 )
 
 type Game struct {
@@ -121,7 +122,7 @@ func (g *Game) reset() {
 	for g.cursor = 0; g.cursor < 12; g.cursor++ {
 		g.board[g.cursor] = deck[g.rands[g.cursor]]
 	}
-	g.logSets()
+	log.Println(g.Sets())
 }
 
 func (g *Game) dealmore() {
@@ -151,7 +152,7 @@ func (g *Game) dealmore() {
 			log.Println(err)
 		}
 	}
-	g.logSets()
+	g.Sets()
 }
 
 func (g *Game) playone(read []int) {
@@ -174,7 +175,7 @@ func (g *Game) playone(read []int) {
 				i++
 			}
 			g.board = newBoard
-			g.logSets()
+			log.Println(g.Sets())
 			g.sendEveryoneEverything()
 			return
 		} else {
@@ -183,7 +184,7 @@ func (g *Game) playone(read []int) {
 			g.board[read[2]] = deck[g.rands[g.cursor + 2]]
 			g.cursor += 3
 		}
-		g.logSets()
+		log.Println(g.Sets())
 		update.Updates = []Update{
 			{Location: read[0], Card: g.board[read[0]]},
 			{Location: read[1], Card: g.board[read[1]]},
@@ -199,13 +200,13 @@ func (g *Game) playone(read []int) {
 	}
 }
 
-func (g Game) logSets() {
+func (g Game) Sets() string {
 	sets := g.findSets()
-	log.Print(len(g.rands) - g.cursor, " left, ", len(sets), " sets:")
+	str := fmt.Sprint(len(g.rands) - g.cursor, " left, ", len(sets), " sets:")
 	for _, set := range sets {
-		log.Print(set[0]+1, "-", g.board[set[0]], set[1]+1, "-",  g.board[set[1]], set[2]+1, "-", g.board[set[2]])
+		str += fmt.Sprint(set[0]+1, "-", g.board[set[0]], set[1]+1, "-",  g.board[set[1]], set[2]+1, "-", g.board[set[2]])
 	}
-	log.Println()
+	return str
 }
 
 func (g Game) findSets() [][]int {
@@ -236,7 +237,7 @@ func (g Game) findSets() [][]int {
 	return sets
 }
 
-func (g *Game) NumConns() int {
+func (g Game) NumConns() int {
 	return len(g.conns)
 }
 

@@ -64,10 +64,17 @@ func WsHandler(ws *websocket.Conn) {
 	}
 }
 
+type info struct {
+	Id string
+	NumConns int
+	Sets string
+}
+
 func Admin(w http.ResponseWriter, r *http.Request) {
-	response := map[string]int{}
+	response := []*info{}
 	for id, game := range games {
-		response[id] = game.NumConns()
+		i := &info{id, game.NumConns(), game.Sets()}
+		response = append(response, i)
 	}
 	_ = json.NewEncoder(w).Encode(response)
 }

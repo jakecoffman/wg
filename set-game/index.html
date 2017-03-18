@@ -218,6 +218,12 @@
     ws.onerror = function (e) {
         console.log('error', e);
     };
+
+    ws.onclose = function (e) {
+        if(window.confirm("You were disconnected, sorry! Start a new game?")) {
+            location.href = './';
+        }
+    }
 </script>
 </body>
 </html>

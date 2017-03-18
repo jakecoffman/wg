@@ -8,11 +8,18 @@
         #cards {
             display: flex;
             flex-direction: column;
+            max-height: 100%;
         }
         .row {
             display: flex;
             flex-direction: row;
             justify-content: center;
+        }
+        #info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
     </style>
 </head>
@@ -48,7 +55,8 @@
 <div id="info">
     <p>Game ID: <span id="gameId"></span>
     <p>Players: <span id="players"></span>
-    <p><button id="nosets" class="pure-button pure-button-primary">No sets</button>
+    <p><button id="nosets" class="pure-button pure-button-primary">no sets (deal more)</button>
+    <p><a href="./" class="pure-button pure-button-primary">new game</a>
 </div>
 
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg">
@@ -123,7 +131,7 @@
   var selected = [];
 
   for (var loc in map) {
-    map[loc].addEventListener('touchstart', selectHandler(loc, map[loc]));
+    map[loc].addEventListener('touchend', selectHandler(loc, map[loc]));
     map[loc].addEventListener('click', selectHandler(loc, map[loc]));
   }
 

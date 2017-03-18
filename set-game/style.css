@@ -644,8 +644,9 @@
     }
 }
 .card {
-    width: 100px;
-    height: 150px;
+    --width: 60px;
+    width: var(--width);
+    height: calc(var(--width) * 1.5);
     background: #fff;
     border-radius: 6px;
     -webkit-box-shadow: 0px 1px 6px 0px rgba(0,0,0,0.3);

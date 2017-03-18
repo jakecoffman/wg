@@ -15,11 +15,13 @@ var games = map[string]*setlib.Game{}
 func init() {
 	// check if games are abandoned, and if so remove them
 	go func() {
-		time.Sleep(1 * time.Minute)
-		for id, game := range games {
-			if game.NumConns() == 0 {
-				game.Stop <- struct{}{}
-				delete(games, id)
+		for {
+			time.Sleep(1 * time.Minute)
+			for id, game := range games {
+				if game.NumConns() == 0 {
+					game.Stop <- struct{}{}
+					delete(games, id)
+				}
 			}
 		}
 	}()

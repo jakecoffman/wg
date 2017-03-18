@@ -6,10 +6,23 @@ import (
 	"math/rand"
 	"net/http"
 	"encoding/json"
+	"time"
 )
 
 // technically not thread-safe
 var games = map[string]*setlib.Game{}
+
+func init() {
+	// check if games are abandoned, and if so remove them
+	go func() {
+		time.Sleep(1 * time.Minute)
+		for id, game := range games {
+			if game.NumConns() == 0 {
+				delete(games, id)
+			}
+		}
+	}()
+}
 
 func WsHandler(ws *websocket.Conn) {
 	defer ws.Close()

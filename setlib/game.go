@@ -39,7 +39,7 @@ func NewGame(id string) *Game {
 }
 
 func (g *Game) run() {
-	gameTimeout := time.NewTimer(1 * time.Hour)
+	gameTimeout := time.NewTimer(1 * time.Minute)
 	for {
 		select {
 		case c := <-g.Join:
@@ -52,19 +52,12 @@ func (g *Game) run() {
 				delete(g.conns, c)
 			}
 			g.sendMetaToEveryone()
-			if len(g.conns) == 0 {
-				if !gameTimeout.Stop() {
-					<-gameTimeout.C
-				}
-				gameTimeout.Reset(time.Minute)
-			}
 		case read := <- g.Play:
 			g.playone(read)
 		case <- g.NoSets:
 			g.dealmore()
 		case <- gameTimeout.C:
 			if len(g.conns) == 0 {
-				log.Println("Game abandoned")
 				return
 			}
 			if !gameTimeout.Stop() {

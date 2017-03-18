@@ -666,7 +666,7 @@
     cursor: pointer;
     -webkit-transition: -webkit-transform 0.2s ease-in-out;
     transition: transform 0.2s ease-in-out;
-    margin: 10px;
+    margin: 1%;
 }
 .card.animate-in {
     -webkit-animation: bounceIn 1s both linear;

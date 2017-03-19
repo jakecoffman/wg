@@ -188,7 +188,7 @@ func (g *Game) playone(read []int) {
 }
 
 func (g Game) Sets() string {
-	sets := g.findSets()
+	sets := g.FindSets()
 	str := fmt.Sprint(len(g.rands) - g.cursor, " left, ", len(sets), " sets:")
 	for _, set := range sets {
 		str += fmt.Sprint(set[0]+1, "-", g.board[set[0]], set[1]+1, "-",  g.board[set[1]], set[2]+1, "-", g.board[set[2]])
@@ -196,7 +196,7 @@ func (g Game) Sets() string {
 	return str
 }
 
-func (g Game) findSets() [][]int {
+func (g Game) FindSets() [][]int {
 	sets := [][]int{}
 	size := len(g.board)
 	var card1, card2, card3 Card

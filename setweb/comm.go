@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"encoding/json"
 	"time"
+	"fmt"
 )
 
 // technically not thread-safe
@@ -89,7 +90,15 @@ type info struct {
 func Admin(w http.ResponseWriter, r *http.Request) {
 	response := []*info{}
 	for id, game := range games {
-		i := &info{id, game.NumConns(), game.Sets()}
+		sets := game.FindSets()
+		strSets := ""
+		for i, set := range sets {
+			strSets += fmt.Sprint(set[0]+1, " ", set[1]+1, " ", set[2]+1)
+			if len(sets) > i+1 {
+				strSets += ", "
+			}
+		}
+		i := &info{id, game.NumConns(), strSets}
 		response = append(response, i)
 	}
 	_ = json.NewEncoder(w).Encode(response)

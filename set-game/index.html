@@ -27,19 +27,20 @@
 <div id="cards"></div>
 
 <div id="info">
-    <p>Game ID: <span id="gameId"></span>
-    <p>Players: <span id="players"></span>
+    <p>game: <span id="gameId"></span>
+    <p>players: <span id="players"></span>
     <p>
         <button id="nosets" class="pure-button pure-button-primary">no sets (deal more)</button>
     <hr/>
     <p><a href="./" class="pure-button">start a new game</a>
     <form class="pure-form" onsubmit="join(this.id.value); return false;">
         <fieldset>
+            <legend>join a game</legend>
             <label>
                 <input type="number" name="id">
             </label>
 
-            <button type="submit" class="pure-button">join a game</button>
+            <button type="submit" class="pure-button">join</button>
         </fieldset>
     </form>
 </div>

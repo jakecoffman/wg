@@ -17,7 +17,7 @@ func init() {
 	// check if games are abandoned, and if so remove them
 	go func() {
 		for {
-			time.Sleep(1 * time.Minute)
+			time.Sleep(24 * time.Hour)
 			for id, game := range games {
 				if game.NumConns() == 0 {
 					game.Stop <- struct{}{}

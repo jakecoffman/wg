@@ -47,6 +47,7 @@ func NewGame(id string) *Game {
 		Stop: make(chan struct{}),
 
 		players: map[*websocket.Conn]*Player{},
+		playerCursor: 1,
 		board: map[int]Card{},
 		Id: id,
 		Created: time.Now(),
@@ -207,6 +208,7 @@ func (g *Game) playone(move *Move) {
 	} else {
 		log.Println("Not a set...")
 		g.players[move.Ws].Score -= 1
+		g.sendMetaToEveryone()
 	}
 }
 

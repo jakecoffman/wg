@@ -5,34 +5,51 @@ import (
 	"log"
 	"golang.org/x/net/websocket"
 	"fmt"
+	"sort"
+	"time"
 )
 
 type Game struct {
-	conns map[*websocket.Conn]bool
+	Join         chan *websocket.Conn `json:"-"`
+	Leave        chan *websocket.Conn `json:"-"`
+	Play         chan *Move `json:"-"`
+	NoSets       chan *websocket.Conn `json:"-"`
+	Stop         chan struct{} `json:"-"`
 
-	Join  chan *websocket.Conn
-	Leave chan *websocket.Conn
-	Play  chan []int
-	NoSets chan struct{}
-	Stop chan struct{}
+	Id           string
+	board        map[int]Card
+	rands        []int
+	cursor       int
 
-	Id string
-	board map[int]Card
-	rands []int
-	cursor int
+	players      map[*websocket.Conn]*Player
+	playerCursor int
+
+	Created      time.Time
+	Updated      time.Time
+}
+
+type Player struct {
+	Id    int
+	Score int
+}
+
+type Move struct {
+	Ws   *websocket.Conn
+	Locs []int
 }
 
 func NewGame(id string) *Game {
 	g := &Game{
 		Join: make(chan *websocket.Conn),
 		Leave: make(chan *websocket.Conn),
-		Play: make(chan []int),
-		NoSets: make(chan struct{}),
+		Play: make(chan *Move),
+		NoSets: make(chan *websocket.Conn),
 		Stop: make(chan struct{}),
 
-		conns: make(map[*websocket.Conn]bool),
+		players: map[*websocket.Conn]*Player{},
 		board: map[int]Card{},
 		Id: id,
+		Created: time.Now(),
 	}
 	go g.run()
 	g.reset()
@@ -43,30 +60,31 @@ func (g *Game) run() {
 	for {
 		select {
 		case c := <-g.Join:
-			log.Println("Player joined")
-			g.conns[c] = true
+			g.players[c] = &Player{Id: g.playerCursor}
+			g.playerCursor += 1
 			g.sendEverything(c)
 			g.sendMetaToEveryone()
 		case c := <-g.Leave:
-			if _, ok := g.conns[c]; ok {
-				delete(g.conns, c)
+			if _, ok := g.players[c]; ok {
+				delete(g.players, c)
 			}
 			g.sendMetaToEveryone()
-		case read := <- g.Play:
-			g.playone(read)
-		case <- g.NoSets:
-			g.dealmore()
-		case <- g.Stop:
+		case move := <-g.Play:
+			g.playone(move)
+		case c := <-g.NoSets:
+			g.dealmore(c)
+		case <-g.Stop:
 			return
 		}
+		g.Updated = time.Now()
 	}
 }
 
 func (g *Game) sendEverything(ws *websocket.Conn) {
-	update := UpdateMsg{Type: "all", Updates: []Update{}, Players: len(g.conns), GameId: g.Id}
+	update := UpdateMsg{Type: "all", Updates: []Update{}, Players: g.SlicePlayers(), GameId: g.Id}
 
 	// order is important when sending all because javascript is rebuilding DOM
-	for i := 0; i< len(g.board); i++ {
+	for i := 0; i < len(g.board); i++ {
 		update.Updates = append(update.Updates, Update{Location: i, Card: g.board[i]})
 	}
 
@@ -77,14 +95,14 @@ func (g *Game) sendEverything(ws *websocket.Conn) {
 }
 
 func (g *Game) sendEveryoneEverything() {
-	update := UpdateMsg{Type: "all", Updates: []Update{}, Players: len(g.conns), GameId: g.Id}
+	update := UpdateMsg{Type: "all", Updates: []Update{}, Players: g.SlicePlayers(), GameId: g.Id}
 
 	// order is important when sending all because javascript is rebuilding DOM
-	for i := 0; i< len(g.board); i++ {
+	for i := 0; i < len(g.board); i++ {
 		update.Updates = append(update.Updates, Update{Location: i, Card: g.board[i]})
 	}
 
-	for ws := range g.conns {
+	for ws := range g.players {
 		if err := websocket.JSON.Send(ws, update); err != nil {
 			log.Println(err)
 			return
@@ -93,9 +111,9 @@ func (g *Game) sendEveryoneEverything() {
 }
 
 func (g *Game) sendMetaToEveryone() {
-	update := UpdateMsg{Type: "meta", Players: len(g.conns), GameId: g.Id}
+	update := UpdateMsg{Type: "meta", Players: g.SlicePlayers(), GameId: g.Id}
 
-	for ws := range g.conns {
+	for ws := range g.players {
 		if err := websocket.JSON.Send(ws, update); err != nil {
 			log.Println(err)
 			return
@@ -112,10 +130,13 @@ func (g *Game) reset() {
 	log.Println(g.Sets())
 }
 
-func (g *Game) dealmore() {
-	//if len(findSets(g.board)) != 0 {
-	//	return
-	//}
+func (g *Game) dealmore(ws *websocket.Conn) {
+	sets := g.FindSets()
+	if len(sets) > 0 {
+		g.players[ws].Score -= len(sets)
+	} else {
+		g.players[ws].Score += 1
+	}
 
 	if g.cursor == len(g.rands) {
 		log.Println("Restarting game")
@@ -128,13 +149,13 @@ func (g *Game) dealmore() {
 	g.board[len(g.board)] = deck[g.rands[g.cursor + 1]]
 	g.board[len(g.board)] = deck[g.rands[g.cursor + 2]]
 	g.cursor += 3
-	update := UpdateMsg{Type: "update", Players: len(g.conns), GameId: g.Id}
+	update := UpdateMsg{Type: "update", Players: g.SlicePlayers(), GameId: g.Id}
 	update.Updates = []Update{
-		{Location: len(g.board)-3, Card: g.board[len(g.board)-3]},
-		{Location: len(g.board)-2, Card: g.board[len(g.board)-2]},
-		{Location: len(g.board)-1, Card: g.board[len(g.board)-1]},
+		{Location: len(g.board) - 3, Card: g.board[len(g.board) - 3]},
+		{Location: len(g.board) - 2, Card: g.board[len(g.board) - 2]},
+		{Location: len(g.board) - 1, Card: g.board[len(g.board) - 1]},
 	}
-	for ws := range g.conns {
+	for ws := range g.players {
 		if err := websocket.JSON.Send(ws, update); err != nil {
 			log.Println(err)
 		}
@@ -142,19 +163,20 @@ func (g *Game) dealmore() {
 	g.Sets()
 }
 
-func (g *Game) playone(read []int) {
-	update := UpdateMsg{Type: "update", Players: len(g.conns), GameId: g.Id}
+func (g *Game) playone(move *Move) {
+	update := UpdateMsg{Type: "update", Players: g.SlicePlayers(), GameId: g.Id}
 
-	if isSet(g.board[read[0]], g.board[read[1]], g.board[read[2]]) {
+	if isSet(g.board[move.Locs[0]], g.board[move.Locs[1]], g.board[move.Locs[2]]) {
+		g.players[move.Ws].Score += 1
 		if (g.cursor == len(g.rands)) {
 			// out of cards
-			g.board[read[0]] = Card{Amount: -1}
-			g.board[read[1]] = Card{Amount: -1}
-			g.board[read[2]] = Card{Amount: -1}
+			g.board[move.Locs[0]] = Card{Amount: -1}
+			g.board[move.Locs[1]] = Card{Amount: -1}
+			g.board[move.Locs[2]] = Card{Amount: -1}
 		} else if (len(g.board) > 12) {
-			delete(g.board, read[0])
-			delete(g.board, read[1])
-			delete(g.board, read[2])
+			delete(g.board, move.Locs[0])
+			delete(g.board, move.Locs[1])
+			delete(g.board, move.Locs[2])
 			newBoard := map[int]Card{}
 			i := 0
 			for _, card := range g.board {
@@ -166,24 +188,25 @@ func (g *Game) playone(read []int) {
 			g.sendEveryoneEverything()
 			return
 		} else {
-			g.board[read[0]] = deck[g.rands[g.cursor + 0]]
-			g.board[read[1]] = deck[g.rands[g.cursor + 1]]
-			g.board[read[2]] = deck[g.rands[g.cursor + 2]]
+			g.board[move.Locs[0]] = deck[g.rands[g.cursor + 0]]
+			g.board[move.Locs[1]] = deck[g.rands[g.cursor + 1]]
+			g.board[move.Locs[2]] = deck[g.rands[g.cursor + 2]]
 			g.cursor += 3
 		}
 		log.Println(g.Sets())
 		update.Updates = []Update{
-			{Location: read[0], Card: g.board[read[0]]},
-			{Location: read[1], Card: g.board[read[1]]},
-			{Location: read[2], Card: g.board[read[2]]},
+			{Location: move.Locs[0], Card: g.board[move.Locs[0]]},
+			{Location: move.Locs[1], Card: g.board[move.Locs[1]]},
+			{Location: move.Locs[2], Card: g.board[move.Locs[2]]},
 		}
-		for ws := range g.conns {
+		for ws := range g.players {
 			if err := websocket.JSON.Send(ws, update); err != nil {
 				log.Println(err)
 			}
 		}
 	} else {
 		log.Println("Not a set...")
+		g.players[move.Ws].Score -= 1
 	}
 }
 
@@ -191,7 +214,7 @@ func (g Game) Sets() string {
 	sets := g.FindSets()
 	str := fmt.Sprint(len(g.rands) - g.cursor, " left, ", len(sets), " sets:")
 	for _, set := range sets {
-		str += fmt.Sprint(set[0]+1, "-", g.board[set[0]], set[1]+1, "-",  g.board[set[1]], set[2]+1, "-", g.board[set[2]])
+		str += fmt.Sprint(set[0] + 1, "-", g.board[set[0]], set[1] + 1, "-", g.board[set[1]], set[2] + 1, "-", g.board[set[2]])
 	}
 	return str
 }
@@ -224,15 +247,26 @@ func (g Game) FindSets() [][]int {
 	return sets
 }
 
+func (g *Game) SlicePlayers() []*Player {
+	players := []*Player{}
+	for _, p := range g.players {
+		players = append(players, p)
+	}
+	sort.Slice(players, func (i, j int) bool {
+		return players[i].Score >= players[j].Score
+	})
+	return players
+}
+
 func (g Game) NumConns() int {
-	return len(g.conns)
+	return len(g.players)
 }
 
 type UpdateMsg struct {
 	Type    string   `json:"type"`
 	Updates []Update `json:"updates"`
 	GameId  string
-	Players int
+	Players []*Player
 }
 
 type Update struct {

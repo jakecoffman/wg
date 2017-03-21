@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"time"
 	"fmt"
+	"log"
 )
 
 // technically not thread-safe
@@ -70,38 +71,37 @@ func WsHandler(ws *websocket.Conn) {
 		}
 		if userInput.Type == "play" {
 			if game != nil {
-				game.Play <- userInput.Play
+				game.Play <- &setlib.Move{Ws: ws, Locs: userInput.Play}
 			}
 		}
 		if userInput.Type == "nosets" {
 			if game != nil {
-				game.NoSets <- struct{}{}
+				game.NoSets <- ws
 			}
 		}
 	}
 }
 
 type info struct {
-	Id string
-	NumConns int
-	Sets string
+	Game *setlib.Game
+	Players []*setlib.Player
+	Sets []string
 }
 
 func Admin(w http.ResponseWriter, r *http.Request) {
 	response := []*info{}
-	for id, game := range games {
+	for _, game := range games {
 		sets := game.FindSets()
-		strSets := ""
-		for i, set := range sets {
-			strSets += fmt.Sprint(set[0]+1, " ", set[1]+1, " ", set[2]+1)
-			if len(sets) > i+1 {
-				strSets += ", "
-			}
+		compactSets := []string{}
+		for _, set := range sets {
+			compactSets = append(compactSets, fmt.Sprint(set[0]+1, " ", set[1]+1, " ", set[2]+1))
 		}
-		i := &info{id, game.NumConns(), strSets}
-		response = append(response, i)
+		n4 := &info{Game: game, Players: game.SlicePlayers(), Sets: compactSets}
+		response = append(response, n4)
 	}
-	_ = json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Println(err)
+	}
 }
 
 const letterBytes = "1234567890"

@@ -10,8 +10,8 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	http.Handle("/set-game/", http.StripPrefix("/set-game", http.FileServer(http.Dir("./set-game"))))
-	http.Handle("/set-game/ws", websocket.Handler(setweb.WsHandler))
-	http.HandleFunc("/set-game/admin", setweb.Admin)
+	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("./set-game"))))
+	http.Handle("/ws", websocket.Handler(setweb.WsHandler))
+	http.HandleFunc("/admin", setweb.Admin)
 	log.Fatal(http.ListenAndServe("0.0.0.0:8222", nil))
 }

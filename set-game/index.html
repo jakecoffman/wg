@@ -3,7 +3,7 @@
     <link rel="stylesheet" href="https://unpkg.com/purecss@0.6.2/build/pure-min.css"
           integrity="sha384-UQiGfs9ICog+LwheBSRCt1o5cbyKIHbwjWscjemyBMT9YCUMZffs6UqUTd0hObXD" crossorigin="anonymous">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/set-game/style.css">
+    <link rel="stylesheet" href="./style.css">
     <style>
         #cards {
             display: flex;
@@ -27,10 +27,9 @@
 <div id="cards"></div>
 
 <div id="info">
-    <p>game: <span id="gameId"></span>
-    <p>players: <span id="players"></span>
-    <p>
-        <button id="nosets" class="pure-button pure-button-primary">no sets (deal more)</button>
+    <p>game: <span id="gameId"></span></p>
+    <div id="players"></div>
+    <p><button id="nosets" class="pure-button pure-button-primary">no sets (deal more)</button></p>
     <hr/>
     <p><a href="./" class="pure-button">start a new game</a>
     <form class="pure-form" onsubmit="join(this.id.value); return false;">
@@ -84,12 +83,11 @@
     } else {
         url = 'ws://';
     }
-    url += location.host + '/set-game/ws';
+    url += location.host + '/ws';
     var ws = new WebSocket(url);
 
     var cards = document.getElementById('cards');
     var gameId = document.getElementById('gameId');
-    var players = document.getElementById('players');
     document.getElementById('nosets').onclick = function () {
         ws.send(JSON.stringify({type: 'nosets'}))
     };
@@ -162,7 +160,7 @@
         switch (data.type) {
             case 'meta':
                 gameId.textContent = data.GameId;
-                players.textContent = data.Players;
+                updatePlayers(data.Players);
                 location.hash = gameId.textContent;
                 break;
             case 'all':
@@ -174,7 +172,7 @@
             case 'update':
                 selected = [];
                 gameId.textContent = data.GameId;
-                players.textContent = data.Players;
+                updatePlayers(data.Players);
                 location.hash = gameId.textContent;
 
                 for (var i = 0; i < data.updates.length; i++) {
@@ -219,6 +217,22 @@
     ws.onerror = function (e) {
         console.log('error', e);
     };
+
+    var players = document.getElementById('players');
+    var cachedPlayers = [];
+    function updatePlayers(playerData) {
+      if (cachedPlayers === playerData) {
+        return;
+      }
+      while (players.firstChild) {
+        players.removeChild(players.firstChild);
+      }
+      for(var i=0; i<playerData.length; i++) {
+        var p = document.createElement('p');
+        p.textContent = 'Player ' + playerData[i].Id + ': ' + playerData[i].Score;
+        players.appendChild(p);
+      }
+    }
 </script>
 </body>
 </html>

@@ -83,7 +83,7 @@
     } else {
         url = 'ws://';
     }
-    url += location.host + '/ws';
+    url += location.host + location.pathname + '/ws';
     var ws = new WebSocket(url);
 
     var cards = document.getElementById('cards');

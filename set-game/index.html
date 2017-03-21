@@ -20,9 +20,25 @@
             justify-content: center;
             align-items: center;
         }
+
+        #disconnected {
+            display: block;
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: #303030;
+            color: white;
+            padding: 10px 40px 10px 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
+
+<div id="disconnected" class="hidden">Sorry, you were disconnected. Refresh to play again.</div>
 
 <div id="cards"></div>
 
@@ -83,7 +99,7 @@
     } else {
         url = 'ws://';
     }
-    url += location.host + location.pathname + '/ws';
+    url += location.host + location.pathname + 'ws';
     var ws = new WebSocket(url);
 
     var cards = document.getElementById('cards');
@@ -216,6 +232,10 @@
 
     ws.onerror = function (e) {
         console.log('error', e);
+    };
+
+    ws.onclose = function (e) {
+        document.getElementById('disconnected').className = '';
     };
 
     var players = document.getElementById('players');

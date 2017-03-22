@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"github.com/google/uuid"
+	"sort"
 )
 
 // technically not thread-safe
@@ -112,6 +113,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		n4 := &info{Game: game, Players: game.SlicePlayers(), Sets: compactSets}
 		response = append(response, n4)
 	}
+	sort.Slice(&response, func(i, j int) bool {
+		return response[i].Game.Id > response[j].Game.Id
+	})
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Println(err)
 	}

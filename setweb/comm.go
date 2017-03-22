@@ -114,7 +114,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		response = append(response, n4)
 	}
 	sort.Slice(response, func(i, j int) bool {
-		return response[i].Game.Updated.Before(response[j].Game.Updated)
+		return response[i].Game.Updated.After(response[j].Game.Updated)
 	})
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Println(err)

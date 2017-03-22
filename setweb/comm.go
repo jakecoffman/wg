@@ -9,6 +9,7 @@ import (
 	"time"
 	"fmt"
 	"log"
+	"github.com/google/uuid"
 )
 
 // technically not thread-safe
@@ -18,10 +19,10 @@ func init() {
 	// check if games are abandoned, and if so remove them
 	go func() {
 		for {
-			time.Sleep(24 * time.Hour)
+			time.Sleep(1 * time.Minute)
 			for id, game := range games {
-				if game.NumConns() == 0 {
-					game.Stop <- struct{}{}
+				if time.Now().Sub(game.Updated).Hours() > 24 && game.NumConns() == 0 {
+					game.Cmd <- &setlib.Command{Type: "Stop"}
 					delete(games, id)
 				}
 			}
@@ -29,31 +30,45 @@ func init() {
 	}()
 }
 
+type userInput struct {
+	Type string `json:"type"`
+	Play []int `json:"play"`
+	Join string `json:"join"`
+}
+
 func WsHandler(ws *websocket.Conn) {
 	defer ws.Close()
 
-	userInput := struct{
-		Type string `json:"type"`
-		Play []int `json:"play"`
-		Join string `json:"join"`
-	}{}
+	var playerId string
+	cookie, err := ws.Request().Cookie(COOKIE_NAME)
+	if err == http.ErrNoCookie {
+		// use has cookies turned off, not going to remember their game as long
+		playerId = uuid.New().String()
+	} else {
+		playerId = cookie.Value
+	}
+
+	input := &userInput{}
 	var game *setlib.Game
+
 	defer func() {
 		if game != nil {
-			game.Leave <- ws
+			game.Cmd <- &setlib.Command{Type: "Disconnect", PlayerId: playerId}
 		}
 	}()
+
 	for {
-		if err := websocket.JSON.Receive(ws, &userInput); err != nil {
+		if err := websocket.JSON.Receive(ws, input); err != nil {
 			return
 		}
-		if userInput.Type == "join" {
+		switch input.Type {
+		case "join":
 			if game != nil {
-				game.Leave <- ws
+				game.Cmd <- &setlib.Command{Type: "Leave", PlayerId: playerId}
 				game = nil
 			}
 
-			id := userInput.Join
+			id := input.Join
 
 			// new
 			if id == "" {
@@ -67,25 +82,23 @@ func WsHandler(ws *websocket.Conn) {
 				games[id] = setlib.NewGame(id)
 			}
 			game = games[id]
-			game.Join <- ws
-		}
-		if userInput.Type == "play" {
+			game.Cmd <- &setlib.Command{Type: "Join", Ws: ws, PlayerId: playerId}
+		case "play":
 			if game != nil {
-				game.Play <- &setlib.Move{Ws: ws, Locs: userInput.Play}
+				game.Cmd <- &setlib.Command{Type: "Play", Locs: input.Play, PlayerId: playerId}
 			}
-		}
-		if userInput.Type == "nosets" {
+		case "nosets":
 			if game != nil {
-				game.NoSets <- ws
+				game.Cmd <- &setlib.Command{Type: "NoSets", PlayerId: playerId}
 			}
 		}
 	}
 }
 
 type info struct {
-	Game *setlib.Game
+	Game    *setlib.Game
 	Players []*setlib.Player
-	Sets []string
+	Sets    []string
 }
 
 func Admin(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +107,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		sets := game.FindSets()
 		compactSets := []string{}
 		for _, set := range sets {
-			compactSets = append(compactSets, fmt.Sprint(set[0]+1, " ", set[1]+1, " ", set[2]+1))
+			compactSets = append(compactSets, fmt.Sprint(set[0] + 1, " ", set[1] + 1, " ", set[2] + 1))
 		}
 		n4 := &info{Game: game, Players: game.SlicePlayers(), Sets: compactSets}
 		response = append(response, n4)
@@ -112,4 +125,18 @@ func genId() string {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(b)
+}
+
+const COOKIE_NAME = "PLAYER_COOKIE"
+
+// CookieMiddleware just makes sure every user gets a cookie
+func CookieMiddleware(handler http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(COOKIE_NAME)
+		if err == http.ErrNoCookie {
+			cookie = &http.Cookie{Name: COOKIE_NAME, Value: uuid.New().String()}
+			http.SetCookie(w, cookie)
+		}
+		handler.ServeHTTP(w, r)
+	}
 }

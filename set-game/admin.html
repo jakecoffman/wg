@@ -3,9 +3,11 @@
     <style>
         table {
             width: 100%;
+            border: 1px solid black;
         }
         td {
             text-align: center;
+            border: 1px solid black;
         }
     </style>
 </head>
@@ -13,8 +15,8 @@
 <table>
     <thead>
     <tr>
-        <th>Game ID</th>
-        <th>Players</th>
+        <th>Game ID (# Plays)</th>
+        <th>Players (Score)</th>
         <th>Sets</th>
         <th>Created</th>
         <th>Updated</th>
@@ -23,10 +25,10 @@
     <tbody>
     {{range $i, $data := .}}
     <tr>
-        <td>{{$data.Game.Id}}</td>
+        <td>{{$data.Game.Id}} ({{$data.Game.Version}})</td>
         <td>
             {{ range $_, $p := $data.Players}}
-            Player {{$p.Id}} - Score: {{$p.Score}} - {{$p.Addr}} <br/>
+            {{$p.Id}} ({{$p.Score}}) {{$p.Addr}} <br/>
             {{end}}
         </td>
         <td>
@@ -34,8 +36,8 @@
             {{$s}} <br/>
             {{end}}
         </td>
-        <td>{{$data.Game.Created.Format "2006-01-02<br/>15:04:05 PM"}}</td>
-        <td>{{$data.Game.Updated.Format "2006-01-02<br/>15:04:05 PM"}}</td>
+        <td>{{$data.Game.Created.Format "01-02<br/>15:04:05"}}</td>
+        <td>{{$data.Game.Updated.Format "01-02<br/>15:04:05"}}</td>
     </tr>
     {{end}}
     </tbody>

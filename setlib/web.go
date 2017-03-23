@@ -21,7 +21,7 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 		sets := game.FindSets()
 		compactSets := []string{}
 		for _, set := range sets {
-			compactSets = append(compactSets, fmt.Sprint(set[0] + 1, " ", set[1] + 1, " ", set[2] + 1))
+			compactSets = append(compactSets, fmt.Sprint(set[0] + 1, ",", set[1] + 1, ",", set[2] + 1))
 		}
 		n4 := info{Game: game, Players: game.SlicePlayersAdmin(), Sets: compactSets}
 		response = append(response, n4)

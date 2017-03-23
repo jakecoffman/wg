@@ -78,6 +78,7 @@ func (g *Set) run() {
 		case "NoSets":
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
+				log.Println("Race condition averted")
 				g.sendMetaToEveryone()
 				continue
 			}
@@ -85,6 +86,7 @@ func (g *Set) run() {
 		case "Play":
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
+				log.Println("Race condition averted")
 				g.sendMetaToEveryone()
 				continue
 			}
@@ -161,8 +163,6 @@ func (g *Set) dealmore(playerId string) {
 		g.players[playerId].Score += 1
 	}
 
-	g.Version += 1
-
 	if g.cursor == len(g.rands) {
 		log.Println("Restarting game")
 		g.reset()
@@ -174,18 +174,22 @@ func (g *Set) dealmore(playerId string) {
 	g.board[len(g.board)] = deck[g.rands[g.cursor + 1]]
 	g.board[len(g.board)] = deck[g.rands[g.cursor + 2]]
 	g.cursor += 3
-	update := &UpdateMsg{Type: "update", Players: g.SlicePlayers(), GameId: g.Id, Version: g.Version}
-	update.Updates = []Update{
-		{Location: len(g.board) - 3, Card: g.board[len(g.board) - 3]},
-		{Location: len(g.board) - 2, Card: g.board[len(g.board) - 2]},
-		{Location: len(g.board) - 1, Card: g.board[len(g.board) - 1]},
+	g.Version += 1
+	update := &UpdateMsg{
+		Type: "update",
+		Players: g.SlicePlayers(),
+		GameId: g.Id,
+		Version: g.Version,
+		Updates: []Update{
+			{Location: len(g.board) - 3, Card: g.board[len(g.board) - 3]},
+			{Location: len(g.board) - 2, Card: g.board[len(g.board) - 2]},
+			{Location: len(g.board) - 1, Card: g.board[len(g.board) - 1]},
+		},
 	}
 	g.sendAll(update)
 }
 
 func (g *Set) playone(cmd *SetCommand) {
-	update := &UpdateMsg{Type: "update", Players: g.SlicePlayers(), GameId: g.Id, Version: g.Version}
-
 	if isSet(g.board[cmd.Locs[0]], g.board[cmd.Locs[1]], g.board[cmd.Locs[2]]) {
 		g.players[cmd.PlayerId].Score += 1
 		if (g.cursor == len(g.rands)) {
@@ -212,12 +216,17 @@ func (g *Set) playone(cmd *SetCommand) {
 			g.board[cmd.Locs[2]] = deck[g.rands[g.cursor + 2]]
 			g.cursor += 3
 		}
-		update.Updates = []Update{
-			{Location: cmd.Locs[0], Card: g.board[cmd.Locs[0]]},
-			{Location: cmd.Locs[1], Card: g.board[cmd.Locs[1]]},
-			{Location: cmd.Locs[2], Card: g.board[cmd.Locs[2]]},
-		}
 		g.Version += 1
+		update := &UpdateMsg{
+			Type: "update",
+			Players: g.SlicePlayers(),
+			GameId: g.Id,
+			Version: g.Version,
+			Updates: []Update{
+				{Location: cmd.Locs[0], Card: g.board[cmd.Locs[0]]},
+				{Location: cmd.Locs[1], Card: g.board[cmd.Locs[1]]},
+				{Location: cmd.Locs[2], Card: g.board[cmd.Locs[2]]},
+			}}
 		g.sendAll(update)
 	} else {
 		log.Println("Not a set...")
@@ -282,11 +291,7 @@ func (g *Set) SlicePlayersAdmin() interface{} {
 	}
 	players := []*playa{}
 	for _, p := range g.players {
-		if p.ws != nil {
-			players = append(players, &playa{Player: p, Addr: p.ip})
-		} else {
-			players = append(players, &playa{Player: p})
-		}
+		players = append(players, &playa{Player: p, Addr: p.ip})
 	}
 	sort.Slice(players, func(i, j int) bool {
 		return players[i].Score >= players[j].Score

@@ -1,0 +1,44 @@
+<html>
+<head>
+    <style>
+        table {
+            width: 100%;
+        }
+        td {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<table>
+    <thead>
+    <tr>
+        <th>Game ID</th>
+        <th>Players</th>
+        <th>Sets</th>
+        <th>Created</th>
+        <th>Updated</th>
+    </tr>
+    </thead>
+    <tbody>
+    {{range $i, $data := .}}
+    <tr>
+        <td>{{$data.Game.Id}}</td>
+        <td>
+            {{ range $_, $p := $data.Players}}
+            Player {{$p.Id}} - Score: {{$p.Score}} - {{$p.Addr}} <br/>
+            {{end}}
+        </td>
+        <td>
+            {{ range $_, $s := $data.Sets}}
+            {{$s}} <br/>
+            {{end}}
+        </td>
+        <td>{{$data.Game.Created.Format "2006-01-02<br/>15:04:05 PM"}}</td>
+        <td>{{$data.Game.Updated.Format "2006-01-02<br/>15:04:05 PM"}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+</table>
+</body>
+</html>

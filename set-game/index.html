@@ -46,7 +46,7 @@
     <p>game: <span id="gameId"></span></p>
     <div id="players"></div>
     <p><button id="nosets" class="pure-button pure-button-primary">no sets (deal more)</button></p>
-    <hr/>
+    <br/>
     <p><a href="./" class="pure-button">start a new game</a>
     <form class="pure-form" onsubmit="join(this.id.value); return false;">
         <fieldset>
@@ -105,7 +105,7 @@
     var cards = document.getElementById('cards');
     var gameId = document.getElementById('gameId');
     document.getElementById('nosets').onclick = function () {
-        ws.send(JSON.stringify({type: 'nosets'}))
+        ws.send(JSON.stringify({type: 'nosets', Version: version}))
     };
 
     var nut = document.getElementById('nut');
@@ -151,7 +151,7 @@
                 for (var s = 0; s < selected.length; s++) {
                     map[selected[s]].classList.remove('selected');
                 }
-                ws.send(JSON.stringify({type: "play", play: selected}));
+                ws.send(JSON.stringify({type: "play", play: selected, Version: version}));
                 selected = [];
             }
             console.log(selected);
@@ -170,6 +170,7 @@
         }
     };
 
+    var version = 0;
     ws.onmessage = function (e) {
         var node;
         var data = JSON.parse(e.data);
@@ -178,6 +179,7 @@
                 gameId.textContent = data.GameId;
                 updatePlayers(data.Players);
                 location.hash = gameId.textContent;
+                version = data.Version;
                 break;
             case 'all':
                 while (cards.firstChild) {
@@ -187,6 +189,7 @@
             // fallthrough
             case 'update':
                 selected = [];
+                version = data.Version;
                 gameId.textContent = data.GameId;
                 updatePlayers(data.Players);
                 location.hash = gameId.textContent;

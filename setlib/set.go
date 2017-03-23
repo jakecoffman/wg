@@ -279,7 +279,7 @@ func (g *Set) SlicePlayersAdmin() interface{} {
 	players := []*playa{}
 	for _, p := range g.players {
 		if p.ws != nil {
-			players = append(players, &playa{Player: p, Addr: p.ws.Request().RemoteAddr})
+			players = append(players, &playa{Player: p, Addr: p.ws.Request().Header.Get("X-Forwarded-For")})
 		} else {
 			players = append(players, &playa{Player: p})
 		}

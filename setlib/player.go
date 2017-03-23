@@ -11,6 +11,7 @@ type Player struct {
 	Id    int
 	Score int
 	Connected bool
+	ip string
 }
 
 type SetCommand struct {

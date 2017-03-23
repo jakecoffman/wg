@@ -15,6 +15,6 @@ func main() {
 	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(setlib.ProcessPlayerCommands)))
 	http.HandleFunc("/admin", setlib.HandleAdmin)
 	host := "0.0.0.0:8222"
-	log.Println("Serving on", host)
+	log.Println("Serving http://localhost:8222")
 	log.Fatal(http.ListenAndServe(host, nil))
 }

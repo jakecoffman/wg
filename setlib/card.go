@@ -6,10 +6,10 @@ import (
 )
 
 type Card struct {
-	Shape   string `json:"shape"`
-	Pattern string `json:"pattern"`
-	Color   string `json:"color"`
-	Amount  int    `json:"amount"`
+	Shape   string `json:"s"`
+	Pattern string `json:"p"`
+	Color   string `json:"c"`
+	Amount  int    `json:"a"`
 }
 
 var deck []Card
@@ -17,9 +17,9 @@ var deck []Card
 func init() {
 	rand.Seed(time.Now().Unix())
 
-	shapes := []string{"pill", "nut", "diamond"}
-	patterns := []string{"hollow", "striped", "solid"}
-	colors := []string{"red", "purple", "green"}
+	shapes := []string{"p", "n", "d"}
+	patterns := []string{"h", "s", "z"}
+	colors := []string{"r", "p", "g"}
 	amount := []int{1, 2, 3}
 
 	deck = []Card{}

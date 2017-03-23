@@ -55,15 +55,17 @@ func (g *Set) run() {
 		}
 		switch cmd.Type {
 		case "Join":
-			if p, ok := g.players[cmd.PlayerId]; ok {
-				// player was here before, update connection
-				p.ws = cmd.Ws
-				p.Connected = true
-			} else {
-				// player was not here before
-				g.players[cmd.PlayerId] = &Player{ws: cmd.Ws, Id: g.playerCursor, Connected: true}
+			var player *Player
+			var ok bool
+			if player, ok = g.players[cmd.PlayerId]; !ok {
+				// player was not here before, create
+				player = &Player{Id: g.playerCursor}
+				g.players[cmd.PlayerId] = player
 				g.playerCursor += 1
 			}
+			player.ws = cmd.Ws
+			player.Connected = true
+			player.ip = player.ws.Request().Header.Get("X-Forwarded-For")
 			g.sendEverythingTo(cmd.Ws)
 			g.sendMetaToEveryone()
 		case "Leave":
@@ -281,7 +283,7 @@ func (g *Set) SlicePlayersAdmin() interface{} {
 	players := []*playa{}
 	for _, p := range g.players {
 		if p.ws != nil {
-			players = append(players, &playa{Player: p, Addr: p.ws.Request().Header.Get("X-Forwarded-For")})
+			players = append(players, &playa{Player: p, Addr: p.ip})
 		} else {
 			players = append(players, &playa{Player: p})
 		}

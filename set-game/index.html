@@ -35,6 +35,28 @@
             display: none;
         }
     </style>
+    <script>
+        var url;
+        if (location.protocol === 'https:') {
+            url = 'wss://';
+        } else {
+            url = 'ws://';
+        }
+        url += location.host + location.pathname + 'ws';
+        var ws = new WebSocket(url);
+
+        ws.onopen = function (e) {
+            if (location.hash && location.hash.length > 1) {
+                join(location.hash.split('#')[1]);
+            } else {
+                join('');
+            }
+        };
+
+        function join(id) {
+            ws.send(JSON.stringify({type: "join", join: id}));
+        }
+    </script>
 </head>
 <body>
 
@@ -93,15 +115,6 @@
     </div>
 </div>
 <script>
-    var url;
-    if (location.protocol === 'https:') {
-        url = 'wss://';
-    } else {
-        url = 'ws://';
-    }
-    url += location.host + location.pathname + 'ws';
-    var ws = new WebSocket(url);
-
     var cards = document.getElementById('cards');
     var gameId = document.getElementById('gameId');
     document.getElementById('nosets').onclick = function () {
@@ -158,18 +171,6 @@
         }
     }
 
-    function join(id) {
-        ws.send(JSON.stringify({type: "join", join: id}));
-    }
-
-    ws.onopen = function (e) {
-        if (location.hash && location.hash.length > 1) {
-            join(location.hash.split('#')[1]);
-        } else {
-            join('');
-        }
-    };
-
     var version = 0;
     ws.onmessage = function (e) {
         var node;
@@ -189,9 +190,6 @@
             // fallthrough
             case 'update':
                 selected = [];
-                version = data.Version;
-                gameId.textContent = data.GameId;
-                updatePlayers(data.Players);
                 location.hash = gameId.textContent;
 
                 for (var i = 0; i < data.updates.length; i++) {
@@ -211,27 +209,54 @@
                         map[update.location] = node;
                     }
                     var shape;
-                    switch (update.card.shape) {
-                        case 'pill':
+                    switch (update.card.s) {
+                        case 'p':
                             shape = pill;
                             break;
-                        case 'diamond':
+                        case 'd':
                             shape = diamond;
                             break;
-                        case 'nut':
+                        case 'n':
                             shape = nut;
                             break;
                     }
-                    for (var j = 0; j < update.card.amount; j++) {
+                    for (var j = 0; j < update.card.a; j++) {
                         node.appendChild(shape.cloneNode(true));
                     }
-                    node.className = 'card select-pop animate-in ' + update.card.pattern + " " + update.card.color;
+                    node.className = 'card select-pop animate-in ' + pattern(update.card.p) + " " + color(update.card.c);
                 }
+                version = data.Version;
+                gameId.textContent = data.GameId;
+                updatePlayers(data.Players);
                 break;
             default:
                 console.log("unknown type", data.type);
         }
     };
+
+    function pattern(p) {
+        if (p === "h") {
+            return "hollow";
+        }
+        if (p === "s") {
+            return "solid";
+        }
+        if (p === "z") {
+            return "striped";
+        }
+    }
+
+    function color(c) {
+        if (c === "r") {
+            return "red"
+        }
+        if (c === "p") {
+            return "purple"
+        }
+        if (c === "g") {
+            return "green"
+        }
+    }
 
     ws.onerror = function (e) {
         console.log('error', e);

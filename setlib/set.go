@@ -76,12 +76,14 @@ func (g *Set) run() {
 		case "NoSets":
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
+				g.sendMetaToEveryone()
 				continue
 			}
 			g.dealmore(cmd.PlayerId)
 		case "Play":
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
+				g.sendMetaToEveryone()
 				continue
 			}
 			g.playone(cmd)

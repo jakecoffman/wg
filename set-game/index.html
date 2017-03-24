@@ -10,8 +10,26 @@
             flex-direction: row;
             justify-content: center;
             flex-wrap: wrap;
-            width: 300px;
             margin: auto;
+        }
+
+        @media (max-width: 600px) {
+            #cards {
+                width: 300px;
+            }
+            .card {
+                width: 70px;
+                --width: 70px;
+            }
+        }
+
+        @media (min-width: 600px) {
+            #cards {
+                width: 400px;
+            }
+            .card {
+                --width: 100px;
+            }
         }
 
         #info {
@@ -33,6 +51,14 @@
 
         .hidden {
             display: none;
+        }
+
+        #id {
+            display: inline;
+        }
+
+        #submit {
+            margin: -6px 0 0;
         }
     </style>
     <script>
@@ -65,19 +91,18 @@
 <div id="cards"></div>
 
 <div id="info">
-    <p>game: <span id="gameId"></span></p>
-    <div id="players"></div>
     <p><button id="nosets" class="pure-button pure-button-primary">no sets (deal more)</button></p>
+    <div id="players"></div>
+    <p>Game ID: <span id="gameId"></span></p>
     <br/>
-    <p><a href="./" class="pure-button">start a new game</a>
+    <p><button class="pure-button" id="newgame">start a new game</button>
     <form class="pure-form" onsubmit="join(this.id.value); return false;">
         <fieldset>
-            <legend>join a game</legend>
+            <legend>join someone else's game</legend>
             <label>
-                <input type="number" name="id">
+                <input type="number" name="id" id="id" placeholder="Game ID">
+                <button id="submit" type="submit" class="pure-button">join</button>
             </label>
-
-            <button type="submit" class="pure-button">join</button>
         </fieldset>
     </form>
 </div>
@@ -155,6 +180,7 @@
             if (index >= 0) {
                 selected.splice(index, 1);
                 node.classList.remove('selected');
+                node.classList.remove('animate-in');
             } else {
                 selected.push(location);
                 node.classList.add('selected');
@@ -167,7 +193,6 @@
                 ws.send(JSON.stringify({type: "play", play: selected, Version: version}));
                 selected = [];
             }
-            console.log(selected);
         }
     }
 
@@ -223,7 +248,7 @@
                     for (var j = 0; j < update.card.a; j++) {
                         node.appendChild(shape.cloneNode(true));
                     }
-                    node.className = 'card select-pop animate-in ' + pattern(update.card.p) + " " + color(update.card.c);
+                    node.className = 'card animate-in ' + pattern(update.card.p) + " " + color(update.card.c);
                 }
                 version = data.Version;
                 gameId.textContent = data.GameId;
@@ -281,6 +306,14 @@
         players.appendChild(p);
       }
     }
+
+    document.getElementById('newgame').addEventListener('click', function(e) {
+      if (confirm('Start a new game and abandon this one?')) {
+        location.href = "./";
+      }
+      e.stopPropagation();
+      e.preventDefault();
+    });
 </script>
 </body>
 </html>

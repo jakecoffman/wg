@@ -28,7 +28,7 @@
         <td>{{$data.Game.Id}} ({{$data.Game.Version}})</td>
         <td>
             {{ range $_, $p := $data.Players}}
-            {{$p.Id}} ({{$p.Score}}) {{$p.Addr}} <br/>
+            {{$p.Id}} ({{$p.Score}}) {{$p.Addr}} {{if $p.Connected}}✅{{end}}<br/>
             {{end}}
         </td>
         <td>

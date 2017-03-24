@@ -68,7 +68,7 @@
         } else {
             url = 'ws://';
         }
-        url += location.host + location.pathname + 'ws';
+        url += location.host + location.pathname + (location.pathname.endsWith('/') ? 'ws' : '/ws');
         var ws = new WebSocket(url);
 
         ws.onopen = function (e) {

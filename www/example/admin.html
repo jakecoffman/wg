@@ -16,8 +16,7 @@
     <thead>
     <tr>
         <th>Game ID (# Plays)</th>
-        <th>Players (Score)</th>
-        <th>Sets</th>
+        <th>Players</th>
         <th>Created</th>
         <th>Updated</th>
     </tr>
@@ -28,16 +27,11 @@
         <td>{{$data.Game.Id}} ({{$data.Game.Version}})</td>
         <td>
             {{ range $_, $p := $data.Players}}
-            {{$p.Id}} ({{$p.Score}}) {{$p.Addr}} {{if $p.Connected}}✅{{end}}<br/>
+            {{$p.Id}} {{$p.Ip}} {{if $p.Connected}}✅{{end}}<br/>
             {{end}}
         </td>
-        <td>
-            {{ range $_, $s := $data.Sets}}
-            {{$s}} <br/>
-            {{end}}
-        </td>
-        <td>{{$data.Game.Created.Format "01-02<br/>15:04:05"}}</td>
-        <td>{{$data.Game.Updated.Format "01-02<br/>15:04:05"}}</td>
+        <td>{{$data.Game.Created.Format "01-02 15:04:05"}}</td>
+        <td>{{$data.Game.Updated.Format "01-02 15:04:05"}}</td>
     </tr>
     {{end}}
     </tbody>

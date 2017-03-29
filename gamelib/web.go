@@ -13,7 +13,7 @@ const COOKIE_NAME = "PLAYER_COOKIE"
 // WsHandler handles player web connections
 func WsHandler(cmdHandler PlayerCommandHandler) websocket.Handler {
 	return func(ws *websocket.Conn) {
-		connHandler(cmdHandler, &WsConn{ws})
+		connHandler(cmdHandler, NewWsConn(ws))
 	}
 }
 
@@ -24,8 +24,8 @@ func connHandler(cmdHandler PlayerCommandHandler, ws Connector) {
 	var playerId string
 	cookie, err := ws.Request().Cookie(COOKIE_NAME)
 	if err == http.ErrNoCookie {
-		// use has cookies turned off, not going to remember their game as long
 		playerId = uuid.New().String()
+		ws.Send(struct{Type, Cookie string}{Type: "cookie", Cookie: COOKIE_NAME+"="+playerId})
 	} else {
 		playerId = cookie.Value
 	}

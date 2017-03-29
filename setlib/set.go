@@ -7,7 +7,6 @@ import (
 	"sort"
 	"time"
 	"github.com/jakecoffman/set-game/gamelib"
-	"sync"
 )
 
 type Set struct {
@@ -110,10 +109,7 @@ func (g *Set) sendEverythingTo(ws gamelib.Connector) {
 		update.Updates = append(update.Updates, Update{Location: i, Card: g.board[i]})
 	}
 
-	if err := ws.Send(update); err != nil {
-		log.Println(err)
-		return
-	}
+	ws.Send(update)
 }
 
 func (g *Set) sendEveryoneEverything() {
@@ -132,19 +128,11 @@ func (g *Set) sendMetaToEveryone() {
 }
 
 func (g *Set) sendAll(msg interface{}) {
-	wg := sync.WaitGroup{}
 	for _, player := range g.players {
 		if player.ws != nil {
-			wg.Add(1)
-			go func (p *Player) {
-				if err := p.ws.Send(msg); err != nil {
-					log.Println(err)
-				}
-				wg.Done()
-			}(player)
+			player.ws.Send(msg)
 		}
 	}
-	wg.Wait()
 }
 
 func (g *Set) reset() {

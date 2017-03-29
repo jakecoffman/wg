@@ -11,7 +11,7 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	http.Handle("/", gamelib.CookieMiddleware(http.StripPrefix("/", http.FileServer(http.Dir("./set-game")))))
+	http.Handle("/", gamelib.CookieMiddleware(http.StripPrefix("/", http.FileServer(http.Dir("./www/set")))))
 	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(setlib.ProcessPlayerCommands)))
 	http.HandleFunc("/admin", setlib.HandleAdmin)
 	host := "0.0.0.0:8222"

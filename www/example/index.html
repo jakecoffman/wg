@@ -1,0 +1,77 @@
+<html>
+<head>
+    <style>
+
+    </style>
+</head>
+<body>
+    <div id="example-app">
+        <a :href="linky()">{{game.Id}}</a>
+        <ul>
+            <li v-for="p in game.Players">
+            {{p}}
+            </li>
+        </ul>
+    </div>
+<script src="https://unpkg.com/vue@2.2.6/dist/vue.min.js"></script>
+<script>
+  var app = new Vue({
+    el: '#example-app',
+    data: {
+      ws: null,
+      game: {Id: '', Players: {}, InGame: false, Version: 0},
+      linky: function() {
+        return 'http://localhost:8111/#' + this.game.Id;
+      }
+    },
+    created: function() {
+      var url;
+      if (location.protocol === 'https:') {
+        url = 'wss://';
+      } else {
+        url = 'ws://';
+      }
+      url += location.host + location.pathname + (location.pathname.endsWith('/') ? 'ws' : '/ws');
+
+      this.ws = new WebSocket(url);
+      this.ws.onopen = this.onopen;
+      this.ws.onmessage = this.onmessage;
+      this.ws.onerror = this.onerror;
+      this.ws.onclose = this.onclose;
+    },
+    methods: {
+      onopen: function() {
+        console.log('Connected');
+        if (location.hash && location.hash.length > 1) {
+          app.ws.send(JSON.stringify({type: "join", join: location.hash.split('#')[1]}));
+        } else {
+          app.ws.send(JSON.stringify({type: "join", join: ''}));
+        }
+      },
+      onerror: function (e) {
+        console.log('error', e);
+      },
+      onclose: function (e) {
+        console.log("disconnected");
+      },
+      onmessage: function (e) {
+        console.log("GOT", e.data);
+        var data = JSON.parse(e.data);
+        switch (data.Type) {
+          case "all":
+            // fallthrough
+          case "meta":
+            location.hash = data.Update.Id;
+            this.game = data.Update;
+            break;
+          case "cookie":
+            document.cookie = data.Cookie;
+            break;
+          default:
+        }
+      }
+    }
+  })
+</script>
+</body>
+</html>

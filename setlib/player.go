@@ -1,7 +1,6 @@
 package setlib
 
 import (
-	"math/rand"
 	"github.com/jakecoffman/set-game/gamelib"
 )
 
@@ -59,12 +58,12 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 
 			// new
 			if id == "" {
-				id = genId()
+				id = gamelib.GenId()
 				Games.Set(id, NewGame(id))
 			}
 
 			if game = Games.Get(id); game == nil {
-				id = genId()
+				id = gamelib.GenId()
 				Games.Set(id, NewGame(id))
 			}
 			game = Games.Get(id)
@@ -79,14 +78,4 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 			}
 		}
 	}
-}
-
-const letterBytes = "1234567890"
-
-func genId() string {
-	b := make([]byte, 6)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }

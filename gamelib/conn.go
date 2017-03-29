@@ -8,7 +8,7 @@ import (
 
 // Connector wraps connections so tests are easier
 type Connector interface {
-	Send(v interface{}) error
+	Send(v interface{})
 	Recv(v interface{}) error
 	Close() error
 
@@ -16,28 +16,48 @@ type Connector interface {
 }
 
 // WsConn is a websocket connection that implements Connector
-type WsConn struct {
+type wsConn struct {
 	conn *websocket.Conn
+	sendChan chan interface{}
 }
 
-func (c *WsConn) Send(v interface{}) error {
-	if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
-		return err
+func NewWsConn(ws *websocket.Conn) *wsConn {
+	conn := &wsConn{
+		conn: ws,
+		sendChan: make(chan interface{}),
 	}
-	return websocket.JSON.Send(c.conn, v)
+	go conn.sender()
+	return conn
 }
 
-func (c *WsConn) Recv(v interface{}) error {
+func (c *wsConn) sender() {
+	for {
+		data := <-c.sendChan
+		if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+			return
+		}
+		if err := websocket.JSON.Send(c.conn, data); err != nil {
+			return
+		}
+	}
+}
+
+func (c *wsConn) Send(v interface{}) {
+	c.sendChan <- v
+}
+
+func (c *wsConn) Recv(v interface{}) error {
 	if err := c.conn.SetReadDeadline(time.Now().Add(10 * time.Minute)); err != nil {
 		return err
 	}
 	return websocket.JSON.Receive(c.conn, v)
 }
 
-func (c *WsConn) Close() error {
+func (c *wsConn) Close() error {
+	close(c.sendChan)
 	return c.conn.Close()
 }
 
-func (c *WsConn) Request() *http.Request {
+func (c *wsConn) Request() *http.Request {
 	return c.conn.Request()
 }

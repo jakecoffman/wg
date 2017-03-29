@@ -1,15 +1,14 @@
-package setlib
+package example
 
 import (
 	"net/http"
-	"fmt"
 	"sort"
-	"html/template"
 	"log"
+	"html/template"
 )
 
 type info struct {
-	Game    *Set
+	Game    *Example
 	Players interface{}
 	Sets    []string
 }
@@ -17,19 +16,14 @@ type info struct {
 func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 	response := []info{}
 	for _, id := range Games.Ids() {
-		game := Games.Get(id).(*Set)
-		sets := game.FindSets()
-		compactSets := []string{}
-		for _, set := range sets {
-			compactSets = append(compactSets, fmt.Sprint(set[0] + 1, ",", set[1] + 1, ",", set[2] + 1))
-		}
-		n4 := info{Game: game, Players: game.SlicePlayersAdmin(), Sets: compactSets}
+		game := Games.Get(id).(*Example)
+		n4 := info{Game: game}
 		response = append(response, n4)
 	}
 	sort.Slice(response, func(i, j int) bool {
 		return response[i].Game.Updated.After(response[j].Game.Updated)
 	})
-	t, err := template.ParseFiles("www/set/admin.html")
+	t, err := template.ParseFiles("www/example/admin.html")
 	if err != nil {
 		w.WriteHeader(500)
 		w.Write([]byte(err.Error()))

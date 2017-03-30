@@ -8,31 +8,71 @@
 <body>
     <div id="resistance-app">
         <a :href="linky()">{{game.Id}}</a>
+        State: {{game.State}}
         <ul>
-            <li v-for="p in game.Players">
-            {{p}}
+            <li v-for="(p, index) in game.Players">
+            Player {{p.Id}}
+                <span v-if="p.IsBot">🤖</span>
+                <span v-if="p.IsLeader">🎖</span>
+                <span v-if="p.OnMission">🔫</span>
+                <button v-if="game.State == 'building' && you.IsLeader" @click="toggleteam(index)">Select</button>
+                <span v-if="selected.indexOf(index) > -1">✅</span>
             </li>
         </ul>
+        You {{you}}
+        Missions
+        <ul>
+            <li v-for="m in game.Missions">
+            {{m}}
+            </li>
+        </ul>
+        Num Failed {{game.NumFailed}}
+        Plays {{game.Version}}
         <div v-if="game.State == 'lobby'">
-            Lobby
-            <button @click="send('addbot')">Add bot</button>
-            <button @click="send('removebot')">Remove bot</button>
-            <button @click="send('start')">Start game</button>
+            Waiting for 5 - 10 players.
+            <button @click="send({Type: 'addbot'})">Add bot</button>
+            <button @click="send({Type: 'removebot'})">Remove bot</button>
+            <button @click="send({Type: 'start'})">Start game</button>
         </div>
-        <div v-if="game.State == 'teambuilding'">
-            Team Building
+        <div v-if="game.State == 'building'">
+            Team building
+            <div v-if="you.IsLeader">
+                You are the Leader. Select your away team above.
+                {{selected}}
+                <button @click="send({Type: 'assign', Assignment: selected})">Submit</button>
+            </div>
+            <div v-if="!you.IsLeader">
+                Waiting for leader to select away team.
+            </div>
+        </div>
+        <div v-if="game.State == 'voting'">
+            Vote if you approve of this team
 
-            1. Select away team (leader)
-            Convince the leader you aren't a spy (others)
-
-            2. Vote on team (others)
-
-            3. If mission passes, go to mission, otherwise leader changes and we stay here
-            <button @click="send('mission')">Mission</button>
-            <button @click="send('end')">End game</button>
+            <button @click="send({Type: 'voteteam', Vote: true})">Accept</button>
+            <button @click="send({Type: 'voteteam', Vote: false})">Reject</button>
         </div>
         <div v-if="game.State == 'mission'">
-            Mission pass/fail for people on the mission
+            <div v-if="you.OnMission">
+                <p>Vote for if this mission succeeds or fails
+
+                <p>If you are Resistance, you cannot vote to Fail.
+
+                <button @click="send({Type: 'votemission', Vote: true})">Succeed</button>
+                <button @click="send({Type: 'votemission', Vote: false})">Fail</button>
+            </div>
+            <div v-if="!you.OnMission">
+                Waiting for the players on the mission to vote.
+            </div>
+        </div>
+        <div v-if="game.State == 'spywin'">
+            Spies win!
+
+            <button @click="send({Type: 'ready'})">Ready</button>
+        </div>
+        <div v-if="game.State == 'resistancewin'">
+            Resistance win!
+
+            <button @click="send({Type: 'ready'})">Ready</button>
         </div>
     </div>
 <script>
@@ -41,6 +81,8 @@
     data: {
       ws: null,
       game: {Id: '', Players: {}, InGame: false, Version: 0},
+      you: {},
+      selected: [],
       linky: function() {
         return 'http://localhost:8112/#' + this.game.Id;
       }
@@ -80,20 +122,29 @@
         var data = JSON.parse(e.data);
         switch (data.Type) {
           case "all":
-            // fallthrough
-          case "meta":
             location.hash = data.Update.Id;
             this.game = data.Update;
+            this.you = data.You;
+            this.selected = [];
             break;
           case "cookie":
             document.cookie = data.Cookie;
             break;
           default:
+            console.log("I don't even", data);
         }
       },
-      send: function(type) {
-        console.log("HERE", type);
-        this.ws.send(JSON.stringify({Type: type}));
+      send: function(msg) {
+        msg.Version = this.game.Version;
+        this.ws.send(JSON.stringify(msg));
+      },
+      toggleteam: function(index) {
+        var i = this.selected.indexOf(index);
+        if (i === -1) {
+          this.selected.push(index);
+        } else {
+          this.selected.splice(i, 1);
+        }
       }
     }
   })

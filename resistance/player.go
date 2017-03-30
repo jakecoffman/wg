@@ -11,22 +11,40 @@ type Player struct {
 	Id        int
 	Connected bool
 	Ip        string `json:"-"`
-	IsBot bool
+	IsSpy     bool `json:"-"`
+	IsBot     bool
+	IsReady   bool
+	IsLeader  bool
+	OnMission bool
 }
 
-func Find(players []*Player, uuid string) (*Player, bool) {
-	for _, player := range players {
+// send secret data to users (also makes it easier for frontend)
+type you struct {
+	ws        gamelib.Connector
+	Uuid      string `json:"-"`
+	Id        int
+	Connected bool `json:"-"`
+	Ip        string `json:"-"`
+	IsSpy     bool
+	IsBot     bool `json:"-"`
+	IsReady   bool
+	IsLeader  bool
+	OnMission bool
+}
+
+func Find(players []*Player, uuid string) (*Player, int) {
+	for i, player := range players {
 		if player.Uuid == uuid {
-			return player, true
+			return player, i
 		}
 	}
-	return nil, false
+	return nil, -1
 }
 
 func Remove(players []*Player, uuid string) bool {
 	for i, player := range players {
 		if player.Uuid == uuid {
-			players = append(players[0:i], players[i:]...)
+			players = append(players[0:i], players[i+1:]...)
 			return true
 		}
 	}
@@ -34,29 +52,30 @@ func Remove(players []*Player, uuid string) bool {
 }
 
 type ResistCmd struct {
-	Type     string
+	*UserInput
 	PlayerId string
 	Ws       gamelib.Connector
-	Version  int
 }
 
 func (c *ResistCmd) IsValid() bool {
 	return c.PlayerId != ""
 }
 
-type userInput struct {
-	Type    string
-	Join    string
-	Version int
+type UserInput struct {
+	Type       string
+	Join       string
+	Version    int
+	Assignment []int // leader's team assignment (player locations in array)
+	Vote       bool  // used for team accept and voting on missions
 }
 
 func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
-	input := &userInput{}
+	input := &UserInput{}
 	var game gamelib.Game
 
 	defer func() {
 		if game != nil {
-			game.Cmd(&ResistCmd{Type: disconnect, PlayerId: playerId})
+			game.Cmd(&ResistCmd{UserInput: &UserInput{Type: msg_disconnect}, PlayerId: playerId})
 		}
 	}()
 
@@ -65,9 +84,9 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 			return
 		}
 		switch input.Type {
-		case join:
+		case msg_join:
 			if game != nil {
-				game.Cmd(&ResistCmd{Type: leave, PlayerId: playerId})
+				game.Cmd(&ResistCmd{UserInput: &UserInput{Type: msg_leave}, PlayerId: playerId})
 				game = nil
 			}
 
@@ -84,9 +103,9 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 				Games.Set(id, NewGame(id))
 			}
 			game = Games.Get(id)
-			game.Cmd(&ResistCmd{Type: join, Ws: ws, PlayerId: playerId})
+			game.Cmd(&ResistCmd{Ws: ws, PlayerId: playerId, UserInput: input})
 		default:
-			game.Cmd(&ResistCmd{Type: input.Type, Ws: ws, PlayerId: playerId, Version: input.Version})
+			game.Cmd(&ResistCmd{Ws: ws, PlayerId: playerId, UserInput: input})
 		}
 	}
 }

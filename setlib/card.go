@@ -35,7 +35,7 @@ func init() {
 }
 
 func isSet(card1, card2, card3 Card) bool {
-	if card1.Amount == -1 || card2.Amount == -1 || card3.Amount == -1 {
+	if any(-1, card1.Amount, card2.Amount, card3.Amount) {
 		return false
 	}
 	if !(same(card1.Shape, card2.Shape, card3.Shape) || different(card1.Shape, card2.Shape, card3.Shape)) {
@@ -67,4 +67,13 @@ func sameInt(s1, s2, s3 int) bool {
 
 func differentInt(s1, s2, s3 int) bool {
 	return s1 != s2 && s2 != s3 && s3 != s1
+}
+
+func any(are int, stuff... int) bool {
+	for i := 0; i < len(stuff); i++ {
+		if stuff[i] == are {
+			return true
+		}
+	}
+	return false
 }

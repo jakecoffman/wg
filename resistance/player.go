@@ -18,20 +18,6 @@ type Player struct {
 	OnMission bool
 }
 
-// send secret data to users (also makes it easier for frontend)
-type you struct {
-	ws        gamelib.Connector
-	Uuid      string `json:"-"`
-	Id        int
-	Connected bool `json:"-"`
-	Ip        string `json:"-"`
-	IsSpy     bool
-	IsBot     bool `json:"-"`
-	IsReady   bool
-	IsLeader  bool
-	OnMission bool
-}
-
 func Find(players []*Player, uuid string) (*Player, int) {
 	for i, player := range players {
 		if player.Uuid == uuid {

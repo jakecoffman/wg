@@ -29,7 +29,7 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(response, func(i, j int) bool {
 		return response[i].Game.Updated.After(response[j].Game.Updated)
 	})
-	t, err := template.ParseFiles("www/set/admin.html")
+	t, err := template.New("admin").Parse(adminPage)
 	if err != nil {
 		w.WriteHeader(500)
 		w.Write([]byte(err.Error()))
@@ -39,3 +39,52 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 }
+
+const adminPage = `
+<html>
+<head>
+    <style>
+        table {
+            width: 100%;
+            border: 1px solid black;
+        }
+        td {
+            text-align: center;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+<table>
+    <thead>
+    <tr>
+        <th>Game ID (# Plays)</th>
+        <th>Players (Score)</th>
+        <th>Sets</th>
+        <th>Created</th>
+        <th>Updated</th>
+    </tr>
+    </thead>
+    <tbody>
+    {{range $i, $data := .}}
+    <tr>
+        <td>{{$data.Game.Id}} ({{$data.Game.Version}})</td>
+        <td>
+            {{ range $_, $p := $data.Players}}
+            {{$p.Id}} ({{$p.Score}}) {{$p.Addr}} {{if $p.Connected}}✅{{end}}<br/>
+            {{end}}
+        </td>
+        <td>
+            {{ range $_, $s := $data.Sets}}
+            {{$s}} <br/>
+            {{end}}
+        </td>
+        <td>{{$data.Game.Created.Format "01-02 15:04:05"}}</td>
+        <td>{{$data.Game.Updated.Format "01-02 15:04:05"}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+</table>
+</body>
+</html>
+`

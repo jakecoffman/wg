@@ -11,10 +11,10 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	http.Handle("/", gamelib.CookieMiddleware(http.StripPrefix("/", http.FileServer(http.Dir("./www/set")))))
+	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("./www/set"))))
 	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(setlib.ProcessPlayerCommands)))
 	http.HandleFunc("/admin", setlib.HandleAdmin)
-	host := "0.0.0.0:8222"
-	log.Println("Serving http://localhost:8222")
-	log.Fatal(http.ListenAndServe(host, nil))
+	port := "8222"
+	log.Println("Serving http://localhost:" + port)
+	log.Fatal(http.ListenAndServe("0.0.0.0:" + port, nil))
 }

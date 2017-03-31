@@ -80,7 +80,7 @@
         };
 
         function join(id) {
-            ws.send(JSON.stringify({type: "join", join: id}));
+            ws.send(JSON.stringify({Type: "join", Join: id}));
         }
     </script>
 </head>
@@ -143,7 +143,7 @@
     var cards = document.getElementById('cards');
     var gameId = document.getElementById('gameId');
     document.getElementById('nosets').onclick = function () {
-        ws.send(JSON.stringify({type: 'nosets', Version: version}))
+        ws.send(JSON.stringify({Type: 'nosets', Version: version}))
     };
 
     var nut = document.getElementById('nut');
@@ -186,7 +186,7 @@
                 node.classList.add('selected');
             }
             if (selected.length === 3) {
-                ws.send(JSON.stringify({type: "play", play: selected, Version: version}));
+                ws.send(JSON.stringify({Type: "play", Play: selected, Version: version}));
                 setTimeout(function(){
                   // handles the case where there is no set
                   for (var s = 0; s < selected.length; s++) {
@@ -202,7 +202,11 @@
     ws.onmessage = function (e) {
         var node;
         var data = JSON.parse(e.data);
-        switch (data.type) {
+        switch (data.Type) {
+            case "cookie":
+                document.cookie = data.Cookie;
+                console.log("Set cookie", data.Cookie);
+                break;
             case 'meta':
                 gameId.textContent = data.GameId;
                 updatePlayers(data.Players);
@@ -223,10 +227,10 @@
                 selected = [];
                 location.hash = gameId.textContent;
 
-                for (var i = 0; i < data.updates.length; i++) {
-                    var update = data.updates[i];
+                for (var i = 0; i < data.Updates.length; i++) {
+                    var update = data.Updates[i];
                     // grab the node from the lookup map
-                    node = map[update.location];
+                    node = map[update.Location];
                     if (node) {
                         // clear existing card, if any
                         while (node.firstChild) {
@@ -235,12 +239,12 @@
                     } else {
                         // create it if it doesn't exist
                         node = cards.appendChild(document.createElement('span'));
-                        node.setAttribute('id', update.location);
-                        addEventListeners(update.location, node);
-                        map[update.location] = node;
+                        node.setAttribute('id', update.Location);
+                        addEventListeners(update.Location, node);
+                        map[update.Location] = node;
                     }
                     var shape;
-                    switch (update.card.s) {
+                    switch (update.Card.s) {
                         case 'p':
                             shape = pill;
                             break;
@@ -251,17 +255,17 @@
                             shape = nut;
                             break;
                     }
-                    for (var j = 0; j < update.card.a; j++) {
+                    for (var j = 0; j < update.Card.a; j++) {
                         node.appendChild(shape.cloneNode(true));
                     }
-                    node.className = 'card animate-in ' + pattern(update.card.p) + " " + color(update.card.c);
+                    node.className = 'card animate-in ' + pattern(update.Card.p) + " " + color(update.Card.c);
                 }
                 version = data.Version;
                 gameId.textContent = data.GameId;
                 updatePlayers(data.Players);
                 break;
             default:
-                console.log("unknown type", data.type);
+                console.log("unknown type", data);
         }
     };
 

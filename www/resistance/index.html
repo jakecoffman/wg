@@ -23,6 +23,9 @@
             flex-direction: row;
             justify-content: space-between;
         }
+        #votes, #votes tr, #votes th {
+            border: 1px solid black;
+        }
     </style>
     <script src="https://unpkg.com/vue@2.2.6/dist/vue.min.js"></script>
 </head>
@@ -34,6 +37,7 @@
             <div class="player" v-for="(p, index) in game.Players">
                 <span v-if="p.Id === you.Id">You</span>
                 <span v-if="p.Id !== you.Id">Player {{p.Id}}</span>
+                <span v-if="!p.IsBot && !p.Connected">⚠</span>
                 <span v-if="p.IsBot">🤖</span>
                 <span v-if="p.IsLeader">🎖</span>
                 <span v-if="p.OnMission">🔫</span>
@@ -44,22 +48,39 @@
         You {{you}}
 
         <h2>missions</h2>
-        <ol>
-            <li v-for="m in game.Missions">
+        <ul>
+            <li v-for="(m, i) in game.Missions">
                 <span v-if="!m.Complete">
                     Team members required: {{m.Slots}}
                 </span>
-                <span v-if="m.Complete">
-                    Mission <span v-if="m.Success"> succeeded 🙌</span><span v-if="!m.Success">failed 💥</span>
-                    Team members: <span v-for="i in m.Assignments">Player {{game.Players[i].Id}} </span>
-                    <br/>
-                    Team building votes 🗳:
-                    <span v-for="(v, i) in m.Votes">
-                        Player {{game.Players[i].Id}}: <span v-if="v">✅</span><span v-if="!v">❌</span>
-                    </span>
-                </span>
+                <div v-if="m.Complete">
+                    <div>Mission {{i+1}} <span v-if="m.Success"> succeeded 🙌</span><span v-if="!m.Success">failed 💥</span></div>
+                    <div>Team: <span v-for="i in m.Assignments">Player {{game.Players[i].Id}} </span></div>
+                    <!--Team building votes 🗳:-->
+                    <!--<span v-for="(v, i) in m.Votes">-->
+                        <!--Player {{game.Players[i].Id}}: <span v-if="v">✅</span><span v-if="!v">❌</span>-->
+                    <!--</span>-->
+                </div>
             </li>
-        </ol>
+        </ul>
+
+        <h2>vote history</h2>
+
+        <table id="votes">
+            <thead>
+            <tr>
+                <th>#</th>
+                <th v-for="p in game.Players">{{p.Id}}</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="h in game.History">
+                <td>{{h.Mission}}</td>
+                <td v-for="p in game.Players"><span v-if="h.Votes[p.Id]">👍</span><span v-else>👎</span></td>
+            </tr>
+            </tbody>
+        </table>
+
         <p>Num Failed {{game.NumFailed}}
         <p>Plays {{game.Version}}
         <div v-if="game.State == 'lobby'">

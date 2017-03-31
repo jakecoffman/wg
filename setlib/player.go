@@ -14,11 +14,9 @@ type Player struct {
 }
 
 type SetCommand struct {
-	Type     string
 	Ws       gamelib.Connector
 	PlayerId string
-	Locs     []int
-	Version int
+	*userInput
 }
 
 func (c *SetCommand) IsValid() bool {
@@ -38,8 +36,9 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 	var game gamelib.Game
 
 	defer func() {
+
 		if game != nil {
-			game.Cmd(&SetCommand{Type: "Disconnect", PlayerId: playerId})
+			game.Cmd(&SetCommand{userInput: &userInput{Type: cmd_disconnect}, PlayerId: playerId})
 		}
 	}()
 
@@ -48,9 +47,9 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 			return
 		}
 		switch input.Type {
-		case "join":
+		case cmd_join:
 			if game != nil {
-				game.Cmd(&SetCommand{Type: "Leave", PlayerId: playerId})
+				game.Cmd(&SetCommand{userInput: &userInput{Type: cmd_leave}, PlayerId: playerId})
 				game = nil
 			}
 
@@ -67,14 +66,12 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 				Games.Set(id, NewGame(id))
 			}
 			game = Games.Get(id)
-			game.Cmd(&SetCommand{Type: "Join", Ws: ws, PlayerId: playerId})
-		case "play":
+			game.Cmd(&SetCommand{userInput: input, Ws: ws, PlayerId: playerId})
+		case cmd_stop:
+			// players can't stop the game goroutine
+		default:
 			if game != nil {
-				game.Cmd(&SetCommand{Type: "Play", Locs: input.Play, PlayerId: playerId, Version: input.Version})
-			}
-		case "nosets":
-			if game != nil {
-				game.Cmd(&SetCommand{Type: "NoSets", PlayerId: playerId, Version: input.Version})
+				game.Cmd(&SetCommand{userInput: input, PlayerId: playerId})
 			}
 		}
 	}

@@ -42,6 +42,13 @@ func (g *Example) Cmd(c gamelib.Command) {
 	g.cmd <- c.(*ExampleCommand)
 }
 
+const (
+	cmd_join = "join"
+	cmd_leave = "leave"
+	cmd_disconnect = "disconnect"
+	cmd_stop = "stop"
+)
+
 func (g *Example) run() {
 	var cmd *ExampleCommand
 	for {
@@ -51,7 +58,7 @@ func (g *Example) run() {
 			continue
 		}
 		switch cmd.Type {
-		case "Join":
+		case cmd_join:
 			var player *Player
 			var ok bool
 			if player, ok = g.Players.Find(cmd.PlayerId); !ok {
@@ -65,15 +72,15 @@ func (g *Example) run() {
 			player.ip = player.ws.Request().Header.Get("X-Forwarded-For")
 			g.sendEverythingTo(cmd.Ws)
 			g.sendMetaToEveryone()
-		case "Leave":
+		case cmd_leave:
 			g.Players.Remove(cmd.PlayerId)
 			g.sendMetaToEveryone()
-		case "Disconnect":
+		case cmd_disconnect:
 			p, _ := g.Players.Find(cmd.PlayerId)
 			p.ws = nil
 			p.Connected = false
 			g.sendMetaToEveryone()
-		case "Stop":
+		case cmd_stop:
 			return
 		}
 		g.Updated = time.Now()

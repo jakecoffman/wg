@@ -14,10 +14,11 @@ const (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	// this route is a dev convenience, should be served by a reverse proxy in prod
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(files))))
 	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(example.ProcessPlayerCommands)))
 	http.HandleFunc("/admin", example.HandleAdmin)
-	host := "0.0.0.0:8111"
-	log.Println("Serving http://localhost:8111")
-	log.Fatal(http.ListenAndServe(host, nil))
+	port := "8111"
+	log.Println("Serving http://localhost:" + port)
+	log.Fatal(http.ListenAndServe("0.0.0.0:" + port, nil))
 }

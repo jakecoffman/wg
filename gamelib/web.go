@@ -4,6 +4,7 @@ import (
 	"golang.org/x/net/websocket"
 	"net/http"
 	"github.com/google/uuid"
+	"time"
 )
 
 type PlayerCommandHandler func(Connector, string)
@@ -17,6 +18,10 @@ func WsHandler(cmdHandler PlayerCommandHandler) websocket.Handler {
 	}
 }
 
+type cookieMsg struct {
+	Type, Cookie string
+}
+
 // testable!
 func connHandler(cmdHandler PlayerCommandHandler, ws Connector) {
 	defer ws.Close()
@@ -25,22 +30,11 @@ func connHandler(cmdHandler PlayerCommandHandler, ws Connector) {
 	cookie, err := ws.Request().Cookie(COOKIE_NAME)
 	if err == http.ErrNoCookie {
 		playerId = uuid.New().String()
-		ws.Send(struct{Type, Cookie string}{Type: "cookie", Cookie: COOKIE_NAME+"="+playerId})
+		c := http.Cookie{Name: COOKIE_NAME, Value: playerId, Expires: time.Now().Add(24 * 365 * 20 * time.Hour)}
+		ws.Send(&cookieMsg{Type: "cookie", Cookie: c.String()})
 	} else {
 		playerId = cookie.Value
 	}
 
 	cmdHandler(ws, playerId)
-}
-
-// CookieMiddleware just makes sure every user gets a cookie
-func CookieMiddleware(handler http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(COOKIE_NAME)
-		if err == http.ErrNoCookie {
-			cookie = &http.Cookie{Name: COOKIE_NAME, Value: uuid.New().String()}
-			http.SetCookie(w, cookie)
-		}
-		handler.ServeHTTP(w, r)
-	}
 }

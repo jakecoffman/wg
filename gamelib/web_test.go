@@ -12,38 +12,15 @@ func (t *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
-func TestCookieMiddleware_NoCookie(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/", nil)
-
-	CookieMiddleware(&testHandler{})(w, r)
-
-	cookie := w.Header().Get("Set-Cookie")
-	if cookie == "" {
-		t.Fatal("cookie should have been set", w.Header())
-	}
-	if len(cookie) != 50 {
-		t.Error(cookie)
-	}
-}
-
-func TestCookieMiddleware_AlreadyCookie(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/", nil)
-	r.AddCookie(&http.Cookie{Name: COOKIE_NAME, Value: "BOOP"})
-
-	CookieMiddleware(&testHandler{})(w, r)
-
-	cookie := w.Header().Get("Set-Cookie")
-	if cookie != "" {
-		t.Fatal("new cookie should not have been set", w.Header())
-	}
-}
-
 type fakeConn struct {
 	Connector
 	req *http.Request
 	wasClosed bool
+	sentMsg interface{}
+}
+
+func (c *fakeConn) Send(msg interface{}) {
+	c.sentMsg = msg
 }
 
 func (c *fakeConn) Close() error {
@@ -87,5 +64,9 @@ func TestWsHandler_NoCookie(t *testing.T) {
 	}
 	if !conn.wasClosed {
 		t.Error("Connection should have been closed")
+	}
+	c := conn.sentMsg.(*cookieMsg)
+	if c.Type != "cookie" && len(c.Cookie) != 8 {
+		t.Error("Cookie not sent", c.Type, c.Cookie)
 	}
 }

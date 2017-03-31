@@ -17,7 +17,7 @@ func main() {
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(files))))
 	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(resistance.ProcessPlayerCommands)))
 	http.HandleFunc("/admin", resistance.HandleAdmin)
-	host := "0.0.0.0:8112"
-	log.Println("Serving http://localhost:8112")
-	log.Fatal(http.ListenAndServe(host, nil))
+	port := "8112"
+	log.Println("Serving http://localhost:" + port)
+	log.Fatal(http.ListenAndServe("0.0.0.0:" + port, nil))
 }

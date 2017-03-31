@@ -36,9 +36,9 @@ func (p Players) Remove(uuid string) bool {
 }
 
 type ExampleCommand struct {
-	Type     string
 	PlayerId string
 	Ws       gamelib.Connector
+	*userInput
 }
 
 func (c *ExampleCommand) IsValid() bool {
@@ -57,7 +57,7 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 
 	defer func() {
 		if game != nil {
-			game.Cmd(&ExampleCommand{Type: "Disconnect", PlayerId: playerId})
+			game.Cmd(&ExampleCommand{userInput: &userInput{Type: "disconnect"}, PlayerId: playerId})
 		}
 	}()
 
@@ -66,9 +66,9 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 			return
 		}
 		switch input.Type {
-		case "join":
+		case cmd_join:
 			if game != nil {
-				game.Cmd(&ExampleCommand{Type: "Leave", PlayerId: playerId})
+				game.Cmd(&ExampleCommand{userInput: &userInput{Type: "leave"}, PlayerId: playerId})
 				game = nil
 			}
 
@@ -85,7 +85,11 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 				Games.Set(id, NewGame(id))
 			}
 			game = Games.Get(id)
-			game.Cmd(&ExampleCommand{Type: "Join", Ws: ws, PlayerId: playerId})
+			game.Cmd(&ExampleCommand{userInput: &userInput{Type: "join"}, Ws: ws, PlayerId: playerId})
+		case cmd_stop:
+			// users can't stop the game goroutine
+		default:
+			game.Cmd(&ExampleCommand{Ws: ws, PlayerId: playerId, userInput: input})
 		}
 	}
 }

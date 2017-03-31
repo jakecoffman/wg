@@ -21,6 +21,7 @@ type Resist struct {
 	State          string
 	Missions       []*Mission
 	CurrentMission int
+	History        []*History
 	NumFailed      int
 	Version        int
 	Created        time.Time `json:"-"`
@@ -35,6 +36,12 @@ type Mission struct {
 	Success      bool         // success/fail result
 
 	Complete     bool         // just a flag to tell if the mission has finished
+}
+
+type History struct {
+	Mission int
+	Assignments []int
+	Votes map[int]bool
 }
 
 func NewMissions(slots []int) []*Mission {
@@ -155,15 +162,30 @@ func (g *Resist) run() {
 type UpdateMsg struct {
 	Type   string
 	Update *Resist
-	You    you
+	You    *secret
+}
+
+type secret struct {
+	Id int
+	Spies []int
+	IsReady, IsLeader, OnMission bool
 }
 
 func (g *Resist) sendEveryoneEverything() {
-	msg := &UpdateMsg{Type: "all", Update: g}
-	for _, player := range g.Players {
-		if player.ws != nil {
-			msg.You = you(*player)
-			player.ws.Send(msg)
+	spies := []int{}
+	for i, p := range g.Players {
+		if p.IsSpy {
+			spies = append(spies, i)
+		}
+	}
+	for _, p := range g.Players {
+		if p.ws != nil {
+			msg := &UpdateMsg{Type: "all", Update: g}
+			msg.You = &secret{Id: p.Id, IsReady: p.IsReady, IsLeader: p.IsLeader, OnMission: p.OnMission}
+			if p.IsSpy {
+				msg.You.Spies = spies
+			}
+			p.ws.Send(msg)
 		}
 	}
 }
@@ -361,6 +383,7 @@ func (g *Resist) handleVote(cmd *ResistCmd) bool {
 	}
 
 	if len(thisMission.Votes) == len(g.Players) {
+		g.History = append(g.History, &History{Mission: g.CurrentMission, Assignments: thisMission.Assignments, Votes: thisMission.Votes})
 		g.Version += 1
 		yeas := 0
 		for _, vote := range thisMission.Votes {

@@ -15,7 +15,7 @@ func init() {
 			for _, id := range Games.Ids() {
 				game := Games.Get(id).(*Set)
 				if time.Now().Sub(game.Updated).Hours() > 24 && game.NumConns() == 0 {
-					game.Cmd(&SetCommand{Type: "Stop"})
+					game.Cmd(&SetCommand{userInput: &userInput{Type: cmd_stop}})
 					Games.Delete(id)
 				}
 			}

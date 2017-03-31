@@ -44,6 +44,15 @@ func (g *Set) Cmd(c gamelib.Command) {
 	g.cmd <- c.(*SetCommand)
 }
 
+const (
+	cmd_join = "join"
+	cmd_leave = "leave"
+	cmd_disconnect = "disconnect"
+	cmd_play = "play"
+	cmd_nosets = "nosets"
+	cmd_stop = "stop"
+)
+
 func (g *Set) run() {
 	var cmd *SetCommand
 	for {
@@ -53,7 +62,7 @@ func (g *Set) run() {
 			continue
 		}
 		switch cmd.Type {
-		case "Join":
+		case cmd_join:
 			var player *Player
 			var ok bool
 			if player, ok = g.players[cmd.PlayerId]; !ok {
@@ -67,14 +76,17 @@ func (g *Set) run() {
 			player.ip = player.ws.Request().Header.Get("X-Forwarded-For")
 			g.sendEverythingTo(cmd.Ws)
 			g.sendMetaToEveryone()
-		case "Leave":
+		case cmd_leave:
 			delete(g.players, cmd.PlayerId)
 			g.sendMetaToEveryone()
-		case "Disconnect":
-			g.players[cmd.PlayerId].ws = nil
-			g.players[cmd.PlayerId].Connected = false
-			g.sendMetaToEveryone()
-		case "NoSets":
+		case cmd_disconnect:
+			p := g.players[cmd.PlayerId]
+			if p != nil {
+				g.players[cmd.PlayerId].ws = nil
+				g.players[cmd.PlayerId].Connected = false
+				g.sendMetaToEveryone()
+			}
+		case cmd_nosets:
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
 				log.Println("Race condition averted")
@@ -82,7 +94,7 @@ func (g *Set) run() {
 				continue
 			}
 			g.dealmore(cmd.PlayerId)
-		case "Play":
+		case cmd_play:
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
 				log.Println("Race condition averted")
@@ -90,7 +102,7 @@ func (g *Set) run() {
 				continue
 			}
 			g.playone(cmd)
-		case "Stop":
+		case cmd_stop:
 			return
 		}
 		g.Updated = time.Now()
@@ -178,17 +190,18 @@ func (g *Set) dealmore(playerId string) {
 }
 
 func (g *Set) playone(cmd *SetCommand) {
-	if isSet(g.board[cmd.Locs[0]], g.board[cmd.Locs[1]], g.board[cmd.Locs[2]]) {
+	play := cmd.userInput.Play
+	if isSet(g.board[play[0]], g.board[play[1]], g.board[play[2]]) {
 		g.players[cmd.PlayerId].Score += 1
 		if (g.cursor == len(g.rands)) {
 			// out of cards
-			g.board[cmd.Locs[0]] = Card{Amount: -1}
-			g.board[cmd.Locs[1]] = Card{Amount: -1}
-			g.board[cmd.Locs[2]] = Card{Amount: -1}
+			g.board[play[0]] = Card{Amount: -1}
+			g.board[play[1]] = Card{Amount: -1}
+			g.board[play[2]] = Card{Amount: -1}
 		} else if (len(g.board) > 12) {
-			delete(g.board, cmd.Locs[0])
-			delete(g.board, cmd.Locs[1])
-			delete(g.board, cmd.Locs[2])
+			delete(g.board, play[0])
+			delete(g.board, play[1])
+			delete(g.board, play[2])
 			newBoard := map[int]Card{}
 			i := 0
 			for _, card := range g.board {
@@ -199,9 +212,9 @@ func (g *Set) playone(cmd *SetCommand) {
 			g.sendEveryoneEverything()
 			return
 		} else {
-			g.board[cmd.Locs[0]] = deck[g.rands[g.cursor + 0]]
-			g.board[cmd.Locs[1]] = deck[g.rands[g.cursor + 1]]
-			g.board[cmd.Locs[2]] = deck[g.rands[g.cursor + 2]]
+			g.board[play[0]] = deck[g.rands[g.cursor + 0]]
+			g.board[play[1]] = deck[g.rands[g.cursor + 1]]
+			g.board[play[2]] = deck[g.rands[g.cursor + 2]]
 			g.cursor += 3
 		}
 		g.Version += 1
@@ -211,9 +224,9 @@ func (g *Set) playone(cmd *SetCommand) {
 			GameId: g.Id,
 			Version: g.Version,
 			Updates: []Update{
-				{Location: cmd.Locs[0], Card: g.board[cmd.Locs[0]]},
-				{Location: cmd.Locs[1], Card: g.board[cmd.Locs[1]]},
-				{Location: cmd.Locs[2], Card: g.board[cmd.Locs[2]]},
+				{Location: play[0], Card: g.board[play[0]]},
+				{Location: play[1], Card: g.board[play[1]]},
+				{Location: play[2], Card: g.board[play[2]]},
 			}}
 		g.sendAll(update)
 	} else {
@@ -298,14 +311,14 @@ func (g Set) NumConns() int {
 }
 
 type UpdateMsg struct {
-	Type    string   `json:"type"`
-	Updates []Update `json:"updates"`
+	Type    string
+	Updates []Update
 	GameId  string
 	Players []*Player
 	Version int
 }
 
 type Update struct {
-	Location int `json:"location"`
-	Card     Card   `json:"card"`
+	Location int
+	Card     Card
 }

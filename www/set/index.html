@@ -186,12 +186,14 @@
                 node.classList.add('selected');
             }
             if (selected.length === 3) {
-                // send to backend for verification
-                for (var s = 0; s < selected.length; s++) {
-                    map[selected[s]].classList.remove('selected');
-                }
                 ws.send(JSON.stringify({type: "play", play: selected, Version: version}));
-                selected = [];
+                setTimeout(function(){
+                  // handles the case where there is no set
+                  for (var s = 0; s < selected.length; s++) {
+                    map[selected[s]].classList.remove('selected');
+                  }
+                  selected = [];
+                }, 200);
             }
         }
     }
@@ -212,8 +214,12 @@
                     cards.removeChild(cards.firstChild);
                 }
                 map = {};
+                selected = [];
             // fallthrough
             case 'update':
+                for (var s = 0; s < selected.length; s++) {
+                  map[selected[s]].classList.remove('selected');
+                }
                 selected = [];
                 location.hash = gameId.textContent;
 

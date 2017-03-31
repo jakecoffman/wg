@@ -1,33 +1,67 @@
 <html>
 <head>
     <style>
+        #players {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+        .player {
+            border: 1px solid black;
+            padding: 10px;
+            margin: 10px;
+        }
+        #msgs {
+            position: absolute;
+            left: 10px;
+            bottom: 10px;
+            background: black;
+            color: white;
+            padding: 10px;
 
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+        }
     </style>
     <script src="https://unpkg.com/vue@2.2.6/dist/vue.min.js"></script>
 </head>
 <body>
     <div id="resistance-app">
         <a :href="linky()">{{game.Id}}</a>
-        State: {{game.State}}
-        <ul>
-            <li v-for="(p, index) in game.Players">
-            Player {{p.Id}}
+        <h2>{{game.State}}</h2>
+        <div id="players">
+            <div class="player" v-for="(p, index) in game.Players">
+                <span v-if="p.Id === you.Id">You</span>
+                <span v-if="p.Id !== you.Id">Player {{p.Id}}</span>
                 <span v-if="p.IsBot">🤖</span>
                 <span v-if="p.IsLeader">🎖</span>
                 <span v-if="p.OnMission">🔫</span>
                 <button v-if="game.State == 'building' && you.IsLeader" @click="toggleteam(index)">Select</button>
-                <span v-if="selected.indexOf(index) > -1">✅</span>
-            </li>
-        </ul>
+                <span v-if="selected.indexOf(index) > -1">🔫</span>
+            </div>
+        </div>
         You {{you}}
-        Missions
-        <ul>
+
+        <h2>missions</h2>
+        <ol>
             <li v-for="m in game.Missions">
-            {{m}}
+                <span v-if="!m.Complete">
+                    Team members required: {{m.Slots}}
+                </span>
+                <span v-if="m.Complete">
+                    Mission <span v-if="m.Success"> succeeded 🙌</span><span v-if="!m.Success">failed 💥</span>
+                    Team members: <span v-for="i in m.Assignments">Player {{game.Players[i].Id}} </span>
+                    <br/>
+                    Team building votes 🗳:
+                    <span v-for="(v, i) in m.Votes">
+                        Player {{game.Players[i].Id}}: <span v-if="v">✅</span><span v-if="!v">❌</span>
+                    </span>
+                </span>
             </li>
-        </ul>
-        Num Failed {{game.NumFailed}}
-        Plays {{game.Version}}
+        </ol>
+        <p>Num Failed {{game.NumFailed}}
+        <p>Plays {{game.Version}}
         <div v-if="game.State == 'lobby'">
             Waiting for 5 - 10 players.
             <button @click="send({Type: 'addbot'})">Add bot</button>
@@ -46,7 +80,7 @@
             </div>
         </div>
         <div v-if="game.State == 'voting'">
-            Vote if you approve of this team
+            Vote if you approve of this team.
 
             <button @click="send({Type: 'voteteam', Vote: true})">Accept</button>
             <button @click="send({Type: 'voteteam', Vote: false})">Reject</button>
@@ -74,6 +108,14 @@
 
             <button @click="send({Type: 'ready'})">Ready</button>
         </div>
+        <div id="msgs" v-if="msgs.length > 0">
+            <div>
+                <p v-for="(m, i) in msgs">{{m}}</p>
+            </div>
+            <div>
+                <button id="dismiss" @click="msgs = []">X</button>
+            </div>
+        </div>
     </div>
 <script>
   var app = new Vue({
@@ -83,6 +125,7 @@
       game: {Id: '', Players: {}, InGame: false, Version: 0},
       you: {},
       selected: [],
+      msgs: [],
       linky: function() {
         return 'http://localhost:8112/#' + this.game.Id;
       }
@@ -121,6 +164,9 @@
         console.log("GOT", e.data);
         var data = JSON.parse(e.data);
         switch (data.Type) {
+          case "msg":
+            this.msgs.push(data.Msg);
+            break;
           case "all":
             location.hash = data.Update.Id;
             this.game = data.Update;

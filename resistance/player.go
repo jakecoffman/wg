@@ -41,16 +41,6 @@ func Find(players []*Player, uuid string) (*Player, int) {
 	return nil, -1
 }
 
-func Remove(players []*Player, uuid string) bool {
-	for i, player := range players {
-		if player.Uuid == uuid {
-			players = append(players[0:i], players[i+1:]...)
-			return true
-		}
-	}
-	return false
-}
-
 type ResistCmd struct {
 	*UserInput
 	PlayerId string
@@ -104,6 +94,8 @@ func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {
 			}
 			game = Games.Get(id)
 			game.Cmd(&ResistCmd{Ws: ws, PlayerId: playerId, UserInput: input})
+		case msg_stop:
+			// players can't delete the game
 		default:
 			game.Cmd(&ResistCmd{Ws: ws, PlayerId: playerId, UserInput: input})
 		}

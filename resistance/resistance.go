@@ -93,6 +93,7 @@ const (
 	msg_leave = "leave"
 	msg_disconnect = "disconnect"
 	msg_stop = "stop"
+	msg_name = "name"
 
 	// anyone can do these things
 	msg_addbot = "addbot"
@@ -150,6 +151,8 @@ func (g *Resist) run() {
 			update = g.handleMission(cmd)
 		case msg_ready:
 			update = g.handleReady(cmd)
+		case msg_name:
+			update = g.handleName(cmd)
 		default:
 			log.Println("Unknown message:", cmd.Type)
 			continue
@@ -496,5 +499,21 @@ func (g *Resist) handleMission(cmd *ResistCmd) bool {
 			g.Players[g.Leader].IsLeader = true
 		}
 	}
+	return true
+}
+
+func (g *Resist) handleName(cmd *ResistCmd) bool {
+	p, _ := Find(g.Players, cmd.PlayerId)
+	if g.State != state_lobby && p.Name != "" {
+		sendMsg(p.ws, "Wait for the lobby to change your name again")
+		return false
+	}
+
+	if len(cmd.Name) > 8 {
+		p.Name = cmd.Name[0:8]
+	} else {
+		p.Name = cmd.Name
+	}
+
 	return true
 }

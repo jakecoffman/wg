@@ -15,8 +15,9 @@
 
         .player {
             border: 1px solid black;
-            padding: 10px;
-            margin: 10px;
+            padding: 5px;
+            margin-left: 5px;
+            margin-bottom: 5px;
         }
 
         .you {
@@ -46,66 +47,7 @@
 <div id="resistance-app">
     <a :href="linky()">{{game.Id}}</a>
     <h2>{{game.State}}</h2>
-    <div id="players">
-        <div class="player" v-for="(p, index) in game.Players" :class="{you: p.Id === you.Id}">
-            <span v-if="p.IsLeader">🎖</span>
-            <span v-if="p.Id === you.Id">You</span>
-            <span v-if="p.Id !== you.Id">Player {{p.Id}}</span>
-            <span v-if="revealed && you.Spies && you.Spies.indexOf(index) > -1">🕵</span>
-            <span v-if="!p.IsBot && !p.Connected">⚠</span>
-            <span v-if="p.IsBot">🤖</span>
-            <span v-if="p.OnMission">🔫</span>
-            <button class="pure-button pure-button-primary"
-                    v-if="game.State == 'building' && you.IsLeader"
-                    @click="toggleteam(index)">Select</button>
-            <span v-if="selected.indexOf(index) > -1">🔫</span>
-        </div>
-    </div>
 
-    <button class="pure-button" @click="reveal">Show/Hide spies</button>
-    <div v-if="revealed">
-        <div v-if="!you.Spies">
-            <p>You are not a spy.
-        </div>
-    </div>
-
-    <h2>missions</h2>
-    <ul>
-        <li v-for="(m, i) in game.Missions">
-                <span v-if="!m.Complete">
-                    Team members required: {{m.Slots}}
-                </span>
-            <div v-if="m.Complete">
-                <div>
-                    Mission {{i+1}}
-                    <span v-if="m.Success"> succeeded 🙌</span>
-                    <span v-if="!m.Success">failed <span v-for="n in m.NumFails">💥</span></span>
-                    (<span v-for="i in m.Assignments">Player {{game.Players[i].Id}} </span>)
-                </div>
-            </div>
-        </li>
-    </ul>
-
-    <h2>vote history</h2>
-
-    <table id="votes">
-        <thead>
-        <tr>
-            <th>#</th>
-            <th v-for="p in game.Players" :class="{you: p.Id === you.Id}">{{p.Id}}</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr v-for="h in game.History">
-            <td>{{h.Mission+1}}</td>
-            <td v-for="(p, index) in game.Players" :class="{you: p.Id === you.Id}">
-                <span v-if="h.Votes[index]">👍</span><span v-else>👎</span>
-            </td>
-        </tr>
-        </tbody>
-    </table>
-
-    <p>Rejected votes this round: {{game.NumFailed}} (5 means spies win)</p>
     <div v-if="game.State == 'lobby'">
         Waiting for 5 - 10 players.
         <button class="pure-button pure-button-primary" @click="send({Type: 'addbot'})">Add bot</button>
@@ -156,6 +98,81 @@
 
         <button class="pure-button pure-button-primary" @click="send({Type: 'ready'})">Ready</button>
     </div>
+
+    <br/>
+
+    <div id="players">
+        <div class="player" v-for="(p, index) in game.Players" :class="{you: p.Id === you.Id}">
+            <span v-if="p.IsLeader">🎖</span>
+            <span v-if="p.Name">{{p.Name}}</span>
+            <span v-if="!p.Name && p.Id === you.Id">You</span>
+            <span v-if="!p.Name && p.Id !== you.Id">Player {{p.Id}}</span>
+            <br/>
+            <span v-if="revealed && you.Spies && you.Spies.indexOf(index) > -1">🕵</span>
+            <span v-if="!p.IsBot && !p.Connected">⚠</span>
+            <span v-if="p.IsBot">🤖</span>
+            <span v-if="p.OnMission">🔫</span>
+            <br/>
+            <button class="pure-button pure-button-primary"
+                    v-if="game.State == 'building' && you.IsLeader"
+                    @click="toggleteam(index)">Select</button>
+            <span v-if="selected.indexOf(index) > -1">🔫</span>
+        </div>
+    </div>
+
+    <div v-if="game.State !== 'lobby'">
+        <button class="pure-button" @click="reveal">Show/Hide spies</button>
+        <div v-if="revealed">
+            <div v-if="!you.Spies">
+                <p>You are not a spy.
+            </div>
+        </div>
+    </div>
+
+    <h2>missions</h2>
+    <ul>
+        <li v-for="(m, i) in game.Missions">
+                <span v-if="!m.Complete">
+                    Team members required: {{m.Slots}}
+                </span>
+            <div v-if="m.Complete">
+                <div>
+                    Mission {{i+1}}
+                    <span v-if="m.Success"> succeeded 🙌</span>
+                    <span v-if="!m.Success">failed <span v-for="n in m.NumFails">💥</span></span>
+                    (<span v-for="i in m.Assignments">
+                    <span v-if="game.Players[i].Name">{{game.Players[i].Name}} </span>
+                    <span v-else>Player {{game.Players[i].Id}} </span>
+                    </span>)
+                </div>
+            </div>
+        </li>
+    </ul>
+
+    <h2>vote history</h2>
+
+    <table id="votes">
+        <thead>
+        <tr>
+            <th>#</th>
+            <th v-for="p in game.Players" :class="{you: p.Id === you.Id}">
+                <span v-if="p.Name">{{p.Name}}</span>
+                <span v-else>Player {{p.Id}}</span>
+            </th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr v-for="h in game.History">
+            <td>{{h.Mission+1}}</td>
+            <td v-for="(p, index) in game.Players" :class="{you: p.Id === you.Id}">
+                <span v-if="h.Votes[index]">👍</span><span v-else>👎</span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <p>Rejected votes this round: {{game.NumFailed}} (5 means spies win)</p>
+
     <div id="msgs" v-if="msgs.length > 0">
         <div>
             <p v-for="(m, i) in msgs">{{m}}</p>
@@ -164,6 +181,10 @@
             <button class="pure-button pure-button-primary" id="dismiss" @click="msgs = []">X</button>
         </div>
     </div>
+
+    <br/>
+    <input type="text" maxlength="8" v-model="name" placeholder="Enter name">
+    <button class="pure-button" @click="send({Type: 'name', Name: name})">Change name</button>
 </div>
 <script>
     var app = new Vue({

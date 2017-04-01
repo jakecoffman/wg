@@ -9,6 +9,7 @@ type Player struct {
 	ws        gamelib.Connector
 	Uuid      string `json:"-"`
 	Id        int
+	Name      string
 	Connected bool
 	Ip        string `json:"-"`
 	IsSpy     bool `json:"-"`
@@ -43,6 +44,7 @@ type UserInput struct {
 	Version    int
 	Assignment []int // leader's team assignment (player locations in array)
 	Vote       bool  // used for team accept and voting on missions
+	Name       string
 }
 
 func ProcessPlayerCommands(ws gamelib.Connector, playerId string) {

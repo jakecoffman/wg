@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"github.com/google/uuid"
 	"time"
+	"log"
 )
 
 type PlayerCommandHandler func(Connector, string)
@@ -32,8 +33,10 @@ func connHandler(cmdHandler PlayerCommandHandler, ws Connector) {
 		playerId = uuid.New().String()
 		c := http.Cookie{Name: COOKIE_NAME, Value: playerId, Expires: time.Now().Add(24 * 365 * 20 * time.Hour)}
 		ws.Send(&cookieMsg{Type: "cookie", Cookie: c.String()})
+		log.Println("New player connected", c.String())
 	} else {
 		playerId = cookie.Value
+		log.Println("Player returned", cookie.Value)
 	}
 
 	cmdHandler(ws, playerId)

@@ -187,13 +187,13 @@
             }
             if (selected.length === 3) {
                 ws.send(JSON.stringify({Type: "play", Play: selected, Version: version}));
+                // request animation frame
                 setTimeout(function(){
-                  // handles the case where there is no set
                   for (var s = 0; s < selected.length; s++) {
                     map[selected[s]].classList.remove('selected');
                   }
                   selected = [];
-                }, 200);
+                }, 1);
             }
         }
     }
@@ -221,6 +221,7 @@
                 selected = [];
             // fallthrough
             case 'update':
+                // remove all selections, someone else played
                 for (var s = 0; s < selected.length; s++) {
                   map[selected[s]].classList.remove('selected');
                 }
@@ -236,6 +237,7 @@
                         while (node.firstChild) {
                             node.removeChild(node.firstChild);
                         }
+                        node.classList.remove('animate-in');
                     } else {
                         // create it if it doesn't exist
                         node = cards.appendChild(document.createElement('span'));
@@ -258,7 +260,12 @@
                     for (var j = 0; j < update.Card.a; j++) {
                         node.appendChild(shape.cloneNode(true));
                     }
-                    node.className = 'card animate-in ' + pattern(update.Card.p) + " " + color(update.Card.c);
+                    // request animation frame
+                    setTimeout(function(u, n) {
+                      return function() {
+                        n.className = 'card animate-in ' + pattern(u.Card.p) + " " + color(u.Card.c);
+                      }
+                    }(update, node), 1);
                 }
                 version = data.Version;
                 gameId.textContent = data.GameId;

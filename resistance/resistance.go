@@ -34,6 +34,7 @@ type Mission struct {
 	Votes        map[int]bool // true is accept
 	successVotes map[int]bool // true is pass (this is kept secret)
 	Success      bool         // success/fail result
+	NumFails     int          // number of fail votes on mission
 
 	Complete     bool         // just a flag to tell if the mission has finished
 }
@@ -69,6 +70,7 @@ func NewGame(id string) *Resist {
 
 func (g *Resist) reset() {
 	g.State = state_lobby
+	g.History = []*History{}
 }
 
 func (g *Resist) Cmd(c gamelib.Command) {
@@ -302,8 +304,8 @@ func (g *Resist) handleStart(cmd *ResistCmd) bool {
 	}
 	// assign secret roles to players (based on # of players)
 	{
-		numResistance := map[int]int{5: 3, 6: 4, 7: 4, 8: 5, 9: 6, 10: 6}[len(g.Players)]
-		for i := range rand.Perm(numResistance) {
+		numSpies := map[int]int{5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4}[len(g.Players)]
+		for i := range rand.Perm(numSpies) {
 			g.Players[i].IsSpy = true
 		}
 	}
@@ -377,8 +379,11 @@ func (g *Resist) handleVote(cmd *ResistCmd) bool {
 	// this makes bots vote every time, not efficient but who cares
 	for i, player := range g.Players {
 		if player.IsBot {
-			// TODO: get bot personalities to decide on how to vote
-			thisMission.Votes[i] = rand.Intn(2) == 1 // bots always vote true, for now
+			if g.NumFailed < 4 {
+				thisMission.Votes[i] = rand.Intn(2) == 1
+			} else {
+				thisMission.Votes[i] = true
+			}
 		}
 	}
 
@@ -440,6 +445,10 @@ func (g *Resist) handleMission(cmd *ResistCmd) bool {
 	}
 
 	thisMission := g.Missions[g.CurrentMission]
+	if !p.IsSpy && cmd.Vote == false {
+		sendMsg(p.ws, "Resistance cannot vote to fail missions")
+		return false
+	}
 	thisMission.successVotes[i] = cmd.Vote
 
 	// voting is done
@@ -450,17 +459,19 @@ func (g *Resist) handleMission(cmd *ResistCmd) bool {
 		if g.Leader >= len(g.Players) {
 			g.Leader = 0
 		}
-		g.State = state_teambuilding // go back to team-building by default, unless game ends
 		for _, p := range g.Players {
 			p.OnMission = false
 		}
 		thisMission.Complete = true
+		// figure out if successful or not
 		thisMission.Success = true
 		for _, vote := range thisMission.successVotes {
 			if vote == false {
 				thisMission.Success = false
+				thisMission.NumFails += 1
 			}
 		}
+		// check end game by counting up number of successful/failed missions
 		succeeds := 0
 		fails := 0
 		for _, m := range g.Missions {
@@ -480,6 +491,7 @@ func (g *Resist) handleMission(cmd *ResistCmd) bool {
 			g.resetReadies()
 		} else {
 			// game is not over, assign the next leader
+			g.State = state_teambuilding
 			g.Leader += 1
 			g.Players[g.Leader].IsLeader = true
 		}

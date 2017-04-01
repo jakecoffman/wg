@@ -1,16 +1,28 @@
 <html>
 <head>
+    <link rel="stylesheet" href="https://unpkg.com/purecss@0.6.2/build/pure-min.css" crossorigin="anonymous">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
+        body {
+            margin: 16px;
+        }
+
         #players {
             display: flex;
             flex-direction: row;
             flex-wrap: wrap;
         }
+
         .player {
             border: 1px solid black;
             padding: 10px;
             margin: 10px;
         }
+
+        .you {
+            background: lightblue;
+        }
+
         #msgs {
             position: absolute;
             left: 10px;
@@ -23,6 +35,7 @@
             flex-direction: row;
             justify-content: space-between;
         }
+
         #votes, #votes tr, #votes th {
             border: 1px solid black;
         }
@@ -30,191 +43,219 @@
     <script src="https://unpkg.com/vue@2.2.6/dist/vue.min.js"></script>
 </head>
 <body>
-    <div id="resistance-app">
-        <a :href="linky()">{{game.Id}}</a>
-        <h2>{{game.State}}</h2>
-        <div id="players">
-            <div class="player" v-for="(p, index) in game.Players">
-                <span v-if="p.Id === you.Id">You</span>
-                <span v-if="p.Id !== you.Id">Player {{p.Id}}</span>
-                <span v-if="!p.IsBot && !p.Connected">⚠</span>
-                <span v-if="p.IsBot">🤖</span>
-                <span v-if="p.IsLeader">🎖</span>
-                <span v-if="p.OnMission">🔫</span>
-                <button v-if="game.State == 'building' && you.IsLeader" @click="toggleteam(index)">Select</button>
-                <span v-if="selected.indexOf(index) > -1">🔫</span>
-            </div>
+<div id="resistance-app">
+    <a :href="linky()">{{game.Id}}</a>
+    <h2>{{game.State}}</h2>
+    <div id="players">
+        <div class="player" v-for="(p, index) in game.Players" :class="{you: p.Id === you.Id}">
+            <span v-if="p.IsLeader">🎖</span>
+            <span v-if="p.Id === you.Id">You</span>
+            <span v-if="p.Id !== you.Id">Player {{p.Id}}</span>
+            <span v-if="revealed && you.Spies && you.Spies.indexOf(index) > -1">🕵</span>
+            <span v-if="!p.IsBot && !p.Connected">⚠</span>
+            <span v-if="p.IsBot">🤖</span>
+            <span v-if="p.OnMission">🔫</span>
+            <button class="pure-button pure-button-primary"
+                    v-if="game.State == 'building' && you.IsLeader"
+                    @click="toggleteam(index)">Select</button>
+            <span v-if="selected.indexOf(index) > -1">🔫</span>
         </div>
-        You {{you}}
+    </div>
 
-        <h2>missions</h2>
-        <ul>
-            <li v-for="(m, i) in game.Missions">
+    <button class="pure-button" @click="reveal">Show/Hide spies</button>
+    <div v-if="revealed">
+        <div v-if="!you.Spies">
+            <p>You are not a spy.
+        </div>
+    </div>
+
+    <h2>missions</h2>
+    <ul>
+        <li v-for="(m, i) in game.Missions">
                 <span v-if="!m.Complete">
                     Team members required: {{m.Slots}}
                 </span>
-                <div v-if="m.Complete">
-                    <div>Mission {{i+1}} <span v-if="m.Success"> succeeded 🙌</span><span v-if="!m.Success">failed 💥</span></div>
-                    <div>Team: <span v-for="i in m.Assignments">Player {{game.Players[i].Id}} </span></div>
-                    <!--Team building votes 🗳:-->
-                    <!--<span v-for="(v, i) in m.Votes">-->
-                        <!--Player {{game.Players[i].Id}}: <span v-if="v">✅</span><span v-if="!v">❌</span>-->
-                    <!--</span>-->
+            <div v-if="m.Complete">
+                <div>
+                    Mission {{i+1}}
+                    <span v-if="m.Success"> succeeded 🙌</span>
+                    <span v-if="!m.Success">failed <span v-for="n in m.NumFails">💥</span></span>
+                    (<span v-for="i in m.Assignments">Player {{game.Players[i].Id}} </span>)
                 </div>
-            </li>
-        </ul>
-
-        <h2>vote history</h2>
-
-        <table id="votes">
-            <thead>
-            <tr>
-                <th>#</th>
-                <th v-for="p in game.Players">{{p.Id}}</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="h in game.History">
-                <td>{{h.Mission}}</td>
-                <td v-for="p in game.Players"><span v-if="h.Votes[p.Id]">👍</span><span v-else>👎</span></td>
-            </tr>
-            </tbody>
-        </table>
-
-        <p>Num Failed {{game.NumFailed}}
-        <p>Plays {{game.Version}}
-        <div v-if="game.State == 'lobby'">
-            Waiting for 5 - 10 players.
-            <button @click="send({Type: 'addbot'})">Add bot</button>
-            <button @click="send({Type: 'removebot'})">Remove bot</button>
-            <button @click="send({Type: 'start'})">Start game</button>
-        </div>
-        <div v-if="game.State == 'building'">
-            Team building
-            <div v-if="you.IsLeader">
-                You are the Leader. Select your away team above.
-                {{selected}}
-                <button @click="send({Type: 'assign', Assignment: selected})">Submit</button>
             </div>
-            <div v-if="!you.IsLeader">
-                Waiting for leader to select away team.
-            </div>
-        </div>
-        <div v-if="game.State == 'voting'">
-            Vote if you approve of this team.
+        </li>
+    </ul>
 
-            <button @click="send({Type: 'voteteam', Vote: true})">Accept</button>
-            <button @click="send({Type: 'voteteam', Vote: false})">Reject</button>
-        </div>
-        <div v-if="game.State == 'mission'">
-            <div v-if="you.OnMission">
-                <p>Vote for if this mission succeeds or fails
+    <h2>vote history</h2>
 
-                <p>If you are Resistance, you cannot vote to Fail.
+    <table id="votes">
+        <thead>
+        <tr>
+            <th>#</th>
+            <th v-for="p in game.Players" :class="{you: p.Id === you.Id}">{{p.Id}}</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr v-for="h in game.History">
+            <td>{{h.Mission+1}}</td>
+            <td v-for="(p, index) in game.Players" :class="{you: p.Id === you.Id}">
+                <span v-if="h.Votes[index]">👍</span><span v-else>👎</span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
 
-                <button @click="send({Type: 'votemission', Vote: true})">Succeed</button>
-                <button @click="send({Type: 'votemission', Vote: false})">Fail</button>
-            </div>
-            <div v-if="!you.OnMission">
-                Waiting for the players on the mission to vote.
-            </div>
+    <p>Rejected votes this round: {{game.NumFailed}} (5 means spies win)</p>
+    <div v-if="game.State == 'lobby'">
+        Waiting for 5 - 10 players.
+        <button class="pure-button pure-button-primary" @click="send({Type: 'addbot'})">Add bot</button>
+        <button class="pure-button pure-button-primary" @click="send({Type: 'removebot'})">Remove bot</button>
+        <button class="pure-button pure-button-primary" @click="send({Type: 'start'})">Start game</button>
+    </div>
+    <div v-if="game.State == 'building'">
+        Team building
+        <div v-if="you.IsLeader">
+            You are the Leader. Select your away team above.
+            <button class="pure-button pure-button-primary" @click="send({Type: 'assign', Assignment: selected})">
+                Submit
+            </button>
         </div>
-        <div v-if="game.State == 'spywin'">
-            Spies win!
-
-            <button @click="send({Type: 'ready'})">Ready</button>
-        </div>
-        <div v-if="game.State == 'resistancewin'">
-            Resistance win!
-
-            <button @click="send({Type: 'ready'})">Ready</button>
-        </div>
-        <div id="msgs" v-if="msgs.length > 0">
-            <div>
-                <p v-for="(m, i) in msgs">{{m}}</p>
-            </div>
-            <div>
-                <button id="dismiss" @click="msgs = []">X</button>
-            </div>
+        <div v-if="!you.IsLeader">
+            Waiting for leader to select away team.
         </div>
     </div>
-<script>
-  var app = new Vue({
-    el: '#resistance-app',
-    data: {
-      ws: null,
-      game: {Id: '', Players: {}, InGame: false, Version: 0},
-      you: {},
-      selected: [],
-      msgs: [],
-      linky: function() {
-        return 'http://localhost:8112/#' + this.game.Id;
-      }
-    },
-    created: function() {
-      var url;
-      if (location.protocol === 'https:') {
-        url = 'wss://';
-      } else {
-        url = 'ws://';
-      }
-      url += location.host + location.pathname + (location.pathname.endsWith('/') ? 'ws' : '/ws');
+    <div v-if="game.State == 'voting'">
+        Vote if you approve of this team.
 
-      this.ws = new WebSocket(url);
-      this.ws.onopen = this.onopen;
-      this.ws.onmessage = this.onmessage;
-      this.ws.onerror = this.onerror;
-      this.ws.onclose = this.onclose;
-    },
-    methods: {
-      onopen: function() {
-        console.log('Connected');
-        if (location.hash && location.hash.length > 1) {
-          app.ws.send(JSON.stringify({type: "join", join: location.hash.split('#')[1]}));
-        } else {
-          app.ws.send(JSON.stringify({type: "join", join: ''}));
+        <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: true})">Accept</button>
+        <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: false})">Reject</button>
+    </div>
+    <div v-if="game.State == 'mission'">
+        <div v-if="you.OnMission">
+            <p>Vote for if this mission succeeds or fails
+
+            <p>If you are Resistance, you cannot vote to Fail.
+
+                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Vote: true})">
+                    Succeed
+                </button>
+                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Vote: false})">Fail
+                </button>
+        </div>
+        <div v-if="!you.OnMission">
+            Waiting for the players on the mission to vote.
+        </div>
+    </div>
+    <div v-if="game.State == 'spywin'">
+        Spies win!
+
+        <button class="pure-button pure-button-primary" @click="send({Type: 'ready'})">Ready</button>
+    </div>
+    <div v-if="game.State == 'resistancewin'">
+        Resistance win!
+
+        <button class="pure-button pure-button-primary" @click="send({Type: 'ready'})">Ready</button>
+    </div>
+    <div id="msgs" v-if="msgs.length > 0">
+        <div>
+            <p v-for="(m, i) in msgs">{{m}}</p>
+        </div>
+        <div>
+            <button class="pure-button pure-button-primary" id="dismiss" @click="msgs = []">X</button>
+        </div>
+    </div>
+</div>
+<script>
+    var app = new Vue({
+        el: '#resistance-app',
+        data: {
+            ws: null,
+            game: {Id: '', Players: {}, InGame: false, Version: 0},
+            you: {},
+            selected: [],
+            msgs: [],
+            linky: function () {
+                return 'http://localhost:8112/#' + this.game.Id;
+            },
+            revealed: false,
+            revealTimeout: null
+        },
+        created: function () {
+            var url;
+            if (location.protocol === 'https:') {
+                url = 'wss://';
+            } else {
+                url = 'ws://';
+            }
+            url += location.host + location.pathname + (location.pathname.endsWith('/') ? 'ws' : '/ws');
+
+            this.ws = new WebSocket(url);
+            console.log(new Date().getTime(), 'Connecting');
+            this.ws.onopen = this.onopen;
+            this.ws.onmessage = this.onmessage;
+            this.ws.onerror = this.onerror;
+            this.ws.onclose = this.onclose;
+        },
+        methods: {
+            onopen: function () {
+                console.log(new Date().getTime(), 'Connected');
+                if (location.hash && location.hash.length > 1) {
+                    app.ws.send(JSON.stringify({type: "join", join: location.hash.split('#')[1]}));
+                } else {
+                    app.ws.send(JSON.stringify({type: "join", join: ''}));
+                }
+            },
+            onerror: function (e) {
+                console.log('error', e);
+            },
+            onclose: function (e) {
+                console.log("disconnected");
+            },
+            onmessage: function (e) {
+                var data = JSON.parse(e.data);
+                switch (data.Type) {
+                    case "msg":
+                        this.msgs.push(data.Msg);
+                        break;
+                    case "all":
+                        location.hash = data.Update.Id;
+                        this.game = data.Update;
+                        this.you = data.You;
+                        this.selected = [];
+                        break;
+                    case "cookie":
+                        document.cookie = data.Cookie;
+                        break;
+                    default:
+                        console.log("I don't even", data);
+                }
+            },
+            send: function (msg) {
+                msg.Version = this.game.Version;
+                this.ws.send(JSON.stringify(msg));
+            },
+            toggleteam: function (index) {
+                var i = this.selected.indexOf(index);
+                if (i === -1) {
+                    this.selected.push(index);
+                } else {
+                    this.selected.splice(i, 1);
+                }
+            },
+            reveal: function () {
+                this.revealed = !this.revealed;
+                if (this.revealed) {
+                    if (this.revealTimeout) {
+                        clearTimeout(this.revealTimeout);
+                    }
+                    this.revealTimeout = setTimeout(function () {
+                        this.revealed = false;
+                        this.revealTimeout = null;
+                    }.bind(this), 5000);
+                }
+            }
         }
-      },
-      onerror: function (e) {
-        console.log('error', e);
-      },
-      onclose: function (e) {
-        console.log("disconnected");
-      },
-      onmessage: function (e) {
-        console.log("GOT", e.data);
-        var data = JSON.parse(e.data);
-        switch (data.Type) {
-          case "msg":
-            this.msgs.push(data.Msg);
-            break;
-          case "all":
-            location.hash = data.Update.Id;
-            this.game = data.Update;
-            this.you = data.You;
-            this.selected = [];
-            break;
-          case "cookie":
-            document.cookie = data.Cookie;
-            break;
-          default:
-            console.log("I don't even", data);
-        }
-      },
-      send: function(msg) {
-        msg.Version = this.game.Version;
-        this.ws.send(JSON.stringify(msg));
-      },
-      toggleteam: function(index) {
-        var i = this.selected.indexOf(index);
-        if (i === -1) {
-          this.selected.push(index);
-        } else {
-          this.selected.splice(i, 1);
-        }
-      }
-    }
-  })
+    })
 </script>
 </body>
 </html>

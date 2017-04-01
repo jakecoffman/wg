@@ -70,8 +70,10 @@
         }
         url += location.host + location.pathname + (location.pathname.endsWith('/') ? 'ws' : '/ws');
         var ws = new WebSocket(url);
+        console.log(new Date().getTime(), 'connecting');
 
         ws.onopen = function (e) {
+            console.log(new Date().getTime(), 'connected');
             if (location.hash && location.hash.length > 1) {
                 join(location.hash.split('#')[1]);
             } else {
@@ -260,12 +262,11 @@
                     for (var j = 0; j < update.Card.a; j++) {
                         node.appendChild(shape.cloneNode(true));
                     }
+                    node.className = 'card ' + pattern(update.Card.p) + " " + color(update.Card.c);
                     // request animation frame
-                    setTimeout(function(u, n) {
-                      return function() {
-                        n.className = 'card animate-in ' + pattern(u.Card.p) + " " + color(u.Card.c);
-                      }
-                    }(update, node), 1);
+                    setTimeout(function(n) {
+                      return function() { n.classList.add('animate-in'); }
+                    }(node), 1);
                 }
                 version = data.Version;
                 gameId.textContent = data.GameId;

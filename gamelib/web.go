@@ -31,13 +31,13 @@ func connHandler(cmdHandler PlayerCommandHandler, ws Connector) {
 	cookie, err := ws.Request().Cookie(COOKIE_NAME)
 	if err == http.ErrNoCookie {
 		playerId = uuid.New().String()
-		c := http.Cookie{Name: COOKIE_NAME, Value: playerId, Expires: time.Now().Add(24 * 365 * 20 * time.Hour)}
-		ws.Send(&cookieMsg{Type: "cookie", Cookie: c.String()})
-		log.Println("New player connected", c.String())
+		log.Println("New player connected", playerId, ws.Request().Header.Get("X-Forwarded-For"))
 	} else {
 		playerId = cookie.Value
-		log.Println("Player returned", cookie.Value)
+		log.Println("Player returned", playerId, ws.Request().Header.Get("X-Forwarded-For"))
 	}
+	c := http.Cookie{Name: COOKIE_NAME, Value: playerId, Expires: time.Now().Add(24 * 365 * time.Hour)}
+	ws.Send(&cookieMsg{Type: "cookie", Cookie: c.String()})
 
 	cmdHandler(ws, playerId)
 }

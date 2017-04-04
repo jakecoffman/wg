@@ -4,7 +4,7 @@ if (location.protocol === 'https:') {
 } else {
     url = 'ws://';
 }
-url += location.host + location.pathname + (location.pathname.endsWith('/') ? 'api/ws' : '/api/ws');
+url += location.host + location.pathname + (location.pathname.endsWith('/') ? 'ws' : '/ws');
 var ws = new WebSocket(url);
 console.log(new Date().getTime(), 'connecting');
 

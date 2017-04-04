@@ -34,7 +34,7 @@ var pill = document.getElementById('pill');
 var map = {};
 var selected = [];
 function addEventListeners(position, node) {
-    node.addEventListener('touchend', selectHandler(position, node));
+    node.addEventListener('touchstart', selectHandler(position, node));
     node.addEventListener('click', selectHandler(position, node));
 }
 

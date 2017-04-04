@@ -33,27 +33,13 @@ var pill = document.getElementById('pill');
 
 var map = {};
 var selected = [];
-var startTouch = new Date();
-var justDragged = false;
-
 function addEventListeners(position, node) {
-    node.addEventListener('touchend', selectHandler(position, node, true));
-    node.addEventListener('touchstart', function () {
-        startTouch = new Date();
-    });
-    node.addEventListener('touchmove', function () {
-        justDragged = true;
-    });
-    node.addEventListener('click', selectHandler(position, node, false));
+    node.addEventListener('touchend', selectHandler(position, node));
+    node.addEventListener('click', selectHandler(position, node));
 }
 
 function selectHandler(location, node, touch) {
     return function selectHandler(event) {
-        // prevent dragging causing selection
-        if (touch && (justDragged || new Date() - startTouch < 100)) {
-            justDragged = false;
-            return;
-        }
         event.stopPropagation();
         event.preventDefault();
         if (event.handled === true) {

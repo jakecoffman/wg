@@ -198,3 +198,59 @@ main {
 footer {
     background: #4aa3df;
 }
+
+#cards {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: auto;
+}
+
+@media (max-width: 600px) {
+    #cards {
+        width: 300px;
+    }
+    .card {
+        width: 70px;
+        --width: 70px;
+    }
+}
+
+@media (min-width: 600px) {
+    #cards {
+        width: 400px;
+    }
+    .card {
+        --width: 100px;
+    }
+}
+
+#info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+#disconnected {
+    display: block;
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: #303030;
+    color: white;
+    padding: 10px 40px 10px 20px;
+}
+
+.hidden {
+    display: none;
+}
+
+#id {
+    display: inline;
+}
+
+#submit {
+    margin: -6px 0 0;
+}

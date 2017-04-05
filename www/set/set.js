@@ -38,10 +38,8 @@ function addEventListeners(position, node) {
     node.addEventListener('click', selectHandler(position, node));
 }
 
-function selectHandler(location, node, touch) {
+function selectHandler(location, node) {
     return function selectHandler(event) {
-        event.stopPropagation();
-        event.preventDefault();
         if (event.handled === true) {
             return;
         }

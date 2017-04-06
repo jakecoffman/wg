@@ -14,10 +14,16 @@
         }
 
         .player {
-            border: 1px solid black;
+            border-radius: 6px;
+            -webkit-box-shadow: 0 1px 6px 0 rgba(0,0,0,0.3);
+            box-shadow: 0 1px 6px 0 rgba(0,0,0,0.3);
             padding: 5px;
             margin-left: 5px;
             margin-bottom: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .you {
@@ -37,8 +43,38 @@
             justify-content: space-between;
         }
 
-        #votes, #votes tr, #votes th {
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        table td, table th {
             border: 1px solid black;
+        }
+        table tr:first-child th {
+            border-top: 0;
+        }
+        table tr:last-child td {
+            border-bottom: 0;
+        }
+        table tr td:first-child,
+        table tr th:first-child {
+            border-left: 0;
+        }
+        table tr td:last-child,
+        table tr th:last-child {
+            border-right: 0;
+        }
+
+        #connection {
+            display: block;
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            background: #303030;
+            color: white;
+            padding: 10px 40px 10px 20px;
+            z-index: 1000;
         }
     </style>
     <script src="https://unpkg.com/vue@2.2.6/dist/vue.min.js"></script>
@@ -46,55 +82,66 @@
 <body>
 <div id="resistance-app">
     <a :href="linky()">{{game.Id}}</a>
-    <h2>{{game.State}}</h2>
-
     <div v-if="game.State == 'lobby'">
+        <h2>Waiting for more players</h2>
         Waiting for 5 - 10 players.
-        <button class="pure-button pure-button-primary" @click="send({Type: 'addbot'})">Add bot</button>
-        <button class="pure-button pure-button-primary" @click="send({Type: 'removebot'})">Remove bot</button>
-        <button class="pure-button pure-button-primary" @click="send({Type: 'start'})">Start game</button>
+        <div>
+            <button class="pure-button pure-button-primary" @click="send({Type: 'addbot'})">Add bot</button>
+            <button class="pure-button pure-button-primary" @click="send({Type: 'removebot'})">Remove bot</button>
+            <button class="pure-button pure-button-primary" @click="send({Type: 'start'})">Start game</button>
+        </div>
     </div>
     <div v-if="game.State == 'building'">
-        Team building
         <div v-if="you.IsLeader">
-            You are the Leader. Select your away team above.
-            <button class="pure-button pure-button-primary" @click="send({Type: 'assign', Assignment: selected})">
-                Submit
-            </button>
+            <h2>Build a team</h2>
+            You are the Leader. Select a team to go on the mission.
+            <div>
+                <button class="pure-button pure-button-primary" @click="send({Type: 'assign', Assignment: selected})">
+                    Submit
+                </button>
+            </div>
         </div>
         <div v-if="!you.IsLeader">
+            <h2>Waiting on the Leader</h2>
             Waiting for leader to select away team.
         </div>
     </div>
     <div v-if="game.State == 'voting'">
+        <h2>Vote on mission team</h2>
         Vote if you approve of this team.
-
-        <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: true})">Accept</button>
-        <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: false})">Reject</button>
+        <div>
+            <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: true})">Accept</button>
+            <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: false})">Reject</button>
+        </div>
     </div>
     <div v-if="game.State == 'mission'">
         <div v-if="you.OnMission">
+            <h2>On mission</h2>
             <p>Vote for if this mission succeeds or fails
 
             <p>If you are Resistance, you cannot vote to Fail.
 
+            <div>
                 <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Vote: true})">
                     Succeed
                 </button>
-                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Vote: false})">Fail
+                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Vote: false})">
+                    Fail
                 </button>
+            </div>
         </div>
         <div v-if="!you.OnMission">
+            <h2>Waiting for mission team</h2>
             Waiting for the players on the mission to vote.
         </div>
     </div>
     <div v-if="game.State == 'spywin'">
-        Spies win!
+        <h2>Spies win!</h2>
 
         <button class="pure-button pure-button-primary" @click="send({Type: 'ready'})">Ready</button>
     </div>
     <div v-if="game.State == 'resistancewin'">
-        Resistance win!
+        <h2>Resistance win!</h2>
 
         <button class="pure-button pure-button-primary" @click="send({Type: 'ready'})">Ready</button>
     </div>
@@ -185,6 +232,10 @@
     <br/>
     <input type="text" maxlength="8" v-model="name" placeholder="Enter name">
     <button class="pure-button" @click="send({Type: 'name', Name: name})">Change name</button>
+
+    <div id="connection" v-if="!initial && !connected">
+        You have been disconnected. Refresh to reconnect.
+    </div>
 </div>
 <script>
     var app = new Vue({
@@ -199,7 +250,9 @@
                 return 'http://localhost:8112/#' + this.game.Id;
             },
             revealed: false,
-            revealTimeout: null
+            revealTimeout: null,
+            connected: false,
+            initial: true
         },
         created: function () {
             var url;
@@ -219,6 +272,8 @@
         },
         methods: {
             onopen: function () {
+                this.connected = true;
+                this.initial = false;
                 console.log(new Date().getTime(), 'Connected');
                 if (location.hash && location.hash.length > 1) {
                     app.ws.send(JSON.stringify({type: "join", join: location.hash.split('#')[1]}));
@@ -230,7 +285,7 @@
                 console.log('error', e);
             },
             onclose: function (e) {
-                console.log("disconnected");
+                this.connected = false;
             },
             onmessage: function (e) {
                 var data = JSON.parse(e.data);

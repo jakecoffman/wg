@@ -71,6 +71,17 @@ func NewGame(id string) *Resist {
 func (g *Resist) reset() {
 	g.State = state_lobby
 	g.History = []*History{}
+	g.Missions = []*Mission{}
+	g.NumFailed = 0
+	g.CurrentMission = 0
+	g.Leader = 0
+	for _, p := range g.Players {
+		p.IsSpy = false
+		p.IsLeader = false
+		p.IsReady = false
+		p.OnMission = false
+		p.IsReady = false
+	}
 }
 
 func (g *Resist) Cmd(c gamelib.Command) {
@@ -273,8 +284,7 @@ func (g *Resist) handleReady(cmd *ResistCmd) bool {
 		case state_spywin:
 			fallthrough
 		case state_resistance_win:
-			g.State = state_lobby
-			g.resetReadies()
+			g.reset()
 		default:
 			log.Println("Error: everyone voted ready but I am in state", g.State)
 			g.resetReadies()

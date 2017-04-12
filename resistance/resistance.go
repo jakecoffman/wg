@@ -53,12 +53,6 @@ func Find(players []*Player, uuid string) (*Player, int) {
 	return nil, -1
 }
 
-//type UserInput struct {
-//	Assignment []int // leader's team assignment (player locations in array)
-//	Vote       bool  // used for team accept and voting on missions
-//	Name       string
-//}
-
 type Mission struct {
 	Slots        int          // number of people that need to go
 	Assignments  []int        // the players that will go on the mission
@@ -345,7 +339,10 @@ func (g *Resist) handleStart(cmd *gamelib.Command) bool {
 	// assign secret roles to players (based on # of players)
 	{
 		numSpies := map[int]int{5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4}[len(g.Players)]
-		for _, i := range rand.Perm(numSpies) {
+		for _, i := range rand.Perm(len(g.Players)) {
+			if i >= numSpies {
+				break
+			}
 			g.Players[i].IsSpy = true
 		}
 	}

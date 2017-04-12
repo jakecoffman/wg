@@ -4,10 +4,10 @@ import "testing"
 
 type fakeGame struct {
 	Id string
-	Commands []Command
+	Commands []*Command
 }
 
-func (f *fakeGame) Cmd(c Command) {
+func (f *fakeGame) Cmd(c *Command) {
 	f.Commands = append(f.Commands, c)
 }
 

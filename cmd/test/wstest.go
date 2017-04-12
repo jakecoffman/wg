@@ -18,7 +18,7 @@ const (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(setlib.ProcessPlayerCommands)))
+	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(gamelib.ProcessPlayerCommands(setlib.NewGame))))
 	go func() {
 		log.Fatal(http.ListenAndServe(":8111", nil))
 	}()

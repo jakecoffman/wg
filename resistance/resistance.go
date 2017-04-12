@@ -53,11 +53,11 @@ func Find(players []*Player, uuid string) (*Player, int) {
 	return nil, -1
 }
 
-type UserInput struct {
-	Assignment []int // leader's team assignment (player locations in array)
-	Vote       bool  // used for team accept and voting on missions
-	Name       string
-}
+//type UserInput struct {
+//	Assignment []int // leader's team assignment (player locations in array)
+//	Vote       bool  // used for team accept and voting on missions
+//	Name       string
+//}
 
 type Mission struct {
 	Slots        int          // number of people that need to go
@@ -393,19 +393,19 @@ func (g *Resist) handleAssignTeam(cmd *gamelib.Command) bool {
 	if g.Version != cmd.Version || g.State != state_teambuilding || g.Leader != i {
 		return false
 	}
-	var extra *UserInput
-	err := json.Unmarshal(cmd.Data, extra)
+	var assignment []int
+	err := json.Unmarshal(cmd.Data, &assignment)
 	if err != nil {
 		log.Println(err)
 		sendMsg(p.ws, "Got invalid data for team assignment")
 		return false
 	}
 	thisMission := g.Missions[g.CurrentMission]
-	if len(extra.Assignment) != thisMission.Slots {
-		sendMsg(p.ws, fmt.Sprint("Number of assignments needs to be ", thisMission.Slots, " but got ", len(extra.Assignment)))
+	if len(assignment) != thisMission.Slots {
+		sendMsg(p.ws, fmt.Sprint("Number of assignments needs to be ", thisMission.Slots, " but got ", len(assignment)))
 		return false
 	}
-	thisMission.Assignments = extra.Assignment
+	thisMission.Assignments = assignment
 	for _, i := range thisMission.Assignments {
 		g.Players[i].OnMission = true
 	}
@@ -421,14 +421,14 @@ func (g *Resist) handleVote(cmd *gamelib.Command) bool {
 		return false
 	}
 	thisMission := g.Missions[g.CurrentMission]
-	var extra *UserInput
-	err := json.Unmarshal(cmd.Data, extra)
+	var vote bool
+	err := json.Unmarshal(cmd.Data, &vote)
 	if err != nil {
 		log.Println(err)
 		sendMsg(p.ws, "Got invalid data for team assignment")
 		return false
 	}
-	thisMission.Votes[i] = extra.Vote
+	thisMission.Votes[i] = vote
 
 	// this makes bots vote every time, not efficient but who cares
 	for i, player := range g.Players {
@@ -498,8 +498,8 @@ func (g *Resist) handleMission(cmd *gamelib.Command) bool {
 		return false
 	}
 
-	var extra *UserInput
-	err := json.Unmarshal(cmd.Data, extra)
+	var vote bool
+	err := json.Unmarshal(cmd.Data, &vote)
 	if err != nil {
 		log.Println(err)
 		sendMsg(p.ws, "Got invalid data for team assignment")
@@ -507,11 +507,11 @@ func (g *Resist) handleMission(cmd *gamelib.Command) bool {
 	}
 
 	thisMission := g.Missions[g.CurrentMission]
-	if !p.IsSpy && extra.Vote == false {
+	if !p.IsSpy && vote == false {
 		sendMsg(p.ws, "Resistance cannot vote to fail missions")
 		return false
 	}
-	thisMission.successVotes[i] = extra.Vote
+	thisMission.successVotes[i] = vote
 
 	// voting is done
 	if len(thisMission.successVotes) == len(thisMission.Assignments) {
@@ -568,18 +568,18 @@ func (g *Resist) handleName(cmd *gamelib.Command) bool {
 		return false
 	}
 
-	var extra *UserInput
-	err := json.Unmarshal(cmd.Data, extra)
+	var name string
+	err := json.Unmarshal(cmd.Data, &name)
 	if err != nil {
 		log.Println(err)
 		sendMsg(p.ws, "Got invalid data for team assignment")
 		return false
 	}
 
-	if len(extra.Name) > 8 {
-		p.Name = extra.Name[0:8]
+	if len(name) > 8 {
+		p.Name = name[0:8]
 	} else {
-		p.Name = extra.Name
+		p.Name = name
 	}
 
 	return true

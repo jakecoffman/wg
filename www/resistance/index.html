@@ -96,7 +96,7 @@
             <h2>Build a team</h2>
             You are the Leader. Select a team to go on the mission.
             <div>
-                <button class="pure-button pure-button-primary" @click="send({Type: 'assign', Assignment: selected})">
+                <button class="pure-button pure-button-primary" @click="send({Type: 'assign', Data: selected})">
                     Submit
                 </button>
             </div>
@@ -110,8 +110,8 @@
         <h2>Vote on mission team</h2>
         Vote if you approve of this team.
         <div>
-            <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: true})">Accept</button>
-            <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Vote: false})">Reject</button>
+            <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Data: true})">Accept</button>
+            <button class="pure-button pure-button-primary" @click="send({Type: 'voteteam', Data: false})">Reject</button>
         </div>
     </div>
     <div v-if="game.State == 'mission'">
@@ -122,10 +122,10 @@
             <p>If you are Resistance, you cannot vote to Fail.
 
             <div>
-                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Vote: true})">
+                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Data: true})">
                     Succeed
                 </button>
-                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Vote: false})">
+                <button class="pure-button pure-button-primary" @click="send({Type: 'votemission', Data: false})">
                     Fail
                 </button>
             </div>
@@ -231,7 +231,7 @@
 
     <br/>
     <input type="text" maxlength="8" v-model="name" placeholder="Enter name">
-    <button class="pure-button" @click="send({Type: 'name', Name: name})">Change name</button>
+    <button class="pure-button" @click="send({Type: 'name', Data: name})">Change name</button>
 
     <div id="connection" v-if="!initial && !connected">
         You have been disconnected. Refresh to reconnect.
@@ -276,9 +276,9 @@
                 this.initial = false;
                 console.log(new Date().getTime(), 'Connected');
                 if (location.hash && location.hash.length > 1) {
-                    app.ws.send(JSON.stringify({type: "join", join: location.hash.split('#')[1]}));
+                    app.ws.send(JSON.stringify({Type: "join", Data: location.hash.split('#')[1]}));
                 } else {
-                    app.ws.send(JSON.stringify({type: "join", join: ''}));
+                    app.ws.send(JSON.stringify({Type: "join", Data: ''}));
                 }
             },
             onerror: function (e) {

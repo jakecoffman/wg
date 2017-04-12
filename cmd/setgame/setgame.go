@@ -12,7 +12,7 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("./www/set"))))
-	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(setlib.ProcessPlayerCommands)))
+	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(gamelib.ProcessPlayerCommands(setlib.NewGame))))
 	http.HandleFunc("/admin", setlib.HandleAdmin)
 	port := "8222"
 	log.Println("Serving http://localhost:" + port)

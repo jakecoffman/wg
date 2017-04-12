@@ -1,6 +1,14 @@
 package gamelib
 
-import "sync"
+import (
+	"sync"
+)
+
+var AllGames = NewGames()
+
+type Game interface {
+	Cmd(*Command)
+}
 
 type Games struct {
 	sync.RWMutex

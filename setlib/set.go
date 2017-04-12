@@ -7,10 +7,11 @@ import (
 	"sort"
 	"time"
 	"github.com/jakecoffman/set-game/gamelib"
+	"encoding/json"
 )
 
 type Set struct {
-	cmd          chan *SetCommand `json:"-"`
+	cmd          chan *gamelib.Command `json:"-"`
 
 	Id           string
 	board        map[int]Card
@@ -25,9 +26,17 @@ type Set struct {
 	Updated      time.Time
 }
 
-func NewGame(id string) *Set {
+type Player struct {
+	ws    gamelib.Connector
+	Id    int
+	Score int
+	Connected bool
+	ip string
+}
+
+func NewGame(id string) gamelib.Game {
 	g := &Set{
-		cmd: make(chan *SetCommand),
+		cmd: make(chan *gamelib.Command),
 
 		players: map[string]*Player{},
 		playerCursor: 1,
@@ -40,8 +49,8 @@ func NewGame(id string) *Set {
 	return g
 }
 
-func (g *Set) Cmd(c gamelib.Command) {
-	g.cmd <- c.(*SetCommand)
+func (g *Set) Cmd(c *gamelib.Command) {
+	g.cmd <- c
 }
 
 const (
@@ -54,13 +63,9 @@ const (
 )
 
 func (g *Set) run() {
-	var cmd *SetCommand
+	var cmd *gamelib.Command
 	for {
 		cmd = <-g.cmd
-		if !cmd.IsValid() {
-			log.Printf("Invalid command sent: %#v\n", cmd)
-			continue
-		}
 		switch cmd.Type {
 		case cmd_join:
 			var player *Player
@@ -103,6 +108,7 @@ func (g *Set) run() {
 			}
 			g.playone(cmd)
 		case cmd_stop:
+			log.Println("Stopping set game", g.Id)
 			return
 		}
 		g.Updated = time.Now()
@@ -189,8 +195,13 @@ func (g *Set) dealmore(playerId string) {
 	g.sendAll(update)
 }
 
-func (g *Set) playone(cmd *SetCommand) {
-	play := cmd.userInput.Play
+func (g *Set) playone(cmd *gamelib.Command) {
+	var play []int
+	err := json.Unmarshal(cmd.Data, &play)
+	if err != nil {
+		log.Println("error reading play data", err)
+		return
+	}
 	if isSet(g.board[play[0]], g.board[play[1]], g.board[play[2]]) {
 		g.players[cmd.PlayerId].Score += 1
 		if (g.cursor == len(g.rands)) {

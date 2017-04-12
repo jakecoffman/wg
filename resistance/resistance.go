@@ -7,10 +7,12 @@ import (
 	"github.com/google/uuid"
 	"math/rand"
 	"fmt"
+	"encoding/json"
+	"strconv"
 )
 
 type Resist struct {
-	cmd            chan *ResistCmd `json:"-"`
+	cmd            chan *gamelib.Command `json:"-"`
 
 	Id             string
 
@@ -26,6 +28,35 @@ type Resist struct {
 	Version        int
 	Created        time.Time `json:"-"`
 	Updated        time.Time `json:"-"`
+}
+
+type Player struct {
+	ws        gamelib.Connector
+	Uuid      string `json:"-"`
+	Id        int
+	Name      string
+	Connected bool
+	Ip        string `json:"-"`
+	IsSpy     bool `json:"-"`
+	IsBot     bool
+	IsReady   bool
+	IsLeader  bool
+	OnMission bool
+}
+
+func Find(players []*Player, uuid string) (*Player, int) {
+	for i, player := range players {
+		if player.Uuid == uuid {
+			return player, i
+		}
+	}
+	return nil, -1
+}
+
+type UserInput struct {
+	Assignment []int // leader's team assignment (player locations in array)
+	Vote       bool  // used for team accept and voting on missions
+	Name       string
 }
 
 type Mission struct {
@@ -54,9 +85,9 @@ func NewMissions(slots []int) []*Mission {
 	return missions
 }
 
-func NewGame(id string) *Resist {
+func NewGame(id string) gamelib.Game {
 	g := &Resist{
-		cmd: make(chan *ResistCmd),
+		cmd: make(chan *gamelib.Command),
 
 		Players: []*Player{},
 		playerCursor: 1,
@@ -84,8 +115,8 @@ func (g *Resist) reset() {
 	}
 }
 
-func (g *Resist) Cmd(c gamelib.Command) {
-	g.cmd <- c.(*ResistCmd)
+func (g *Resist) Cmd(c *gamelib.Command) {
+	g.cmd <- c
 }
 
 // states
@@ -120,7 +151,7 @@ const (
 )
 
 func (g *Resist) run() {
-	var cmd *ResistCmd
+	var cmd *gamelib.Command
 	var update bool
 	for {
 		// handle the case where a bot is leader
@@ -134,10 +165,6 @@ func (g *Resist) run() {
 			g.sendEveryoneEverything()
 		}
 		cmd = <-g.cmd
-		if !cmd.IsValid() {
-			log.Printf("Invalid command sent: %#v\n", cmd)
-			continue
-		}
 
 		switch cmd.Type {
 		case msg_join:
@@ -221,7 +248,7 @@ func (g *Resist) resetReadies() {
 	}
 }
 
-func (g *Resist) handleJoin(cmd *ResistCmd) bool {
+func (g *Resist) handleJoin(cmd *gamelib.Command) bool {
 	player, i := Find(g.Players, cmd.PlayerId)
 	if i == -1 {
 		// player was not here before
@@ -244,7 +271,7 @@ func (g *Resist) handleJoin(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleLeave(cmd *ResistCmd) bool {
+func (g *Resist) handleLeave(cmd *gamelib.Command) bool {
 	for i, player := range g.Players {
 		if player.Uuid == cmd.PlayerId {
 			g.Players = append(g.Players[0:i], g.Players[i+1:]...)
@@ -254,7 +281,7 @@ func (g *Resist) handleLeave(cmd *ResistCmd) bool {
 	return false
 }
 
-func (g *Resist) handleDisconnect(cmd *ResistCmd) bool {
+func (g *Resist) handleDisconnect(cmd *gamelib.Command) bool {
 	player, i := Find(g.Players, cmd.PlayerId)
 	if i == -1 {
 		log.Println("Couldn't find player", cmd.PlayerId)
@@ -265,7 +292,7 @@ func (g *Resist) handleDisconnect(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleReady(cmd *ResistCmd) bool {
+func (g *Resist) handleReady(cmd *gamelib.Command) bool {
 	allReady := true
 	for _, p := range g.Players {
 		if p.Uuid == cmd.PlayerId {
@@ -293,7 +320,7 @@ func (g *Resist) handleReady(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleStart(cmd *ResistCmd) bool {
+func (g *Resist) handleStart(cmd *gamelib.Command) bool {
 	if g.Version != cmd.Version || g.State != state_lobby || len(g.Players) < 5 {
 		return false
 	}
@@ -337,7 +364,7 @@ func (g *Resist) handleStart(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleAddBot(cmd *ResistCmd) bool {
+func (g *Resist) handleAddBot(cmd *gamelib.Command) bool {
 	if len(g.Players) >= 10 {
 		p, _ := Find(g.Players, cmd.PlayerId)
 		sendMsg(p.ws, "Can't have more than 10 players")
@@ -349,7 +376,7 @@ func (g *Resist) handleAddBot(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleRemoveBot(cmd *ResistCmd) bool {
+func (g *Resist) handleRemoveBot(cmd *gamelib.Command) bool {
 	for i, p := range g.Players {
 		if p.IsBot {
 			g.Players = append(g.Players[0:i], g.Players[i+1:]...)
@@ -361,17 +388,24 @@ func (g *Resist) handleRemoveBot(cmd *ResistCmd) bool {
 	return false
 }
 
-func (g *Resist) handleAssignTeam(cmd *ResistCmd) bool {
+func (g *Resist) handleAssignTeam(cmd *gamelib.Command) bool {
 	p, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != state_teambuilding || g.Leader != i {
 		return false
 	}
-	thisMission := g.Missions[g.CurrentMission]
-	if len(cmd.UserInput.Assignment) != thisMission.Slots {
-		sendMsg(p.ws, fmt.Sprint("Number of assignments needs to be ", thisMission.Slots, " but got ", len(cmd.UserInput.Assignment)))
+	var extra *UserInput
+	err := json.Unmarshal(cmd.Data, extra)
+	if err != nil {
+		log.Println(err)
+		sendMsg(p.ws, "Got invalid data for team assignment")
 		return false
 	}
-	thisMission.Assignments = cmd.UserInput.Assignment
+	thisMission := g.Missions[g.CurrentMission]
+	if len(extra.Assignment) != thisMission.Slots {
+		sendMsg(p.ws, fmt.Sprint("Number of assignments needs to be ", thisMission.Slots, " but got ", len(extra.Assignment)))
+		return false
+	}
+	thisMission.Assignments = extra.Assignment
 	for _, i := range thisMission.Assignments {
 		g.Players[i].OnMission = true
 	}
@@ -380,14 +414,21 @@ func (g *Resist) handleAssignTeam(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleVote(cmd *ResistCmd) bool {
-	_, i := Find(g.Players, cmd.PlayerId)
+func (g *Resist) handleVote(cmd *gamelib.Command) bool {
+	p, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != state_teamvoting {
 		log.Println(g.Version, cmd.Version, g.State)
 		return false
 	}
 	thisMission := g.Missions[g.CurrentMission]
-	thisMission.Votes[i] = cmd.UserInput.Vote
+	var extra *UserInput
+	err := json.Unmarshal(cmd.Data, extra)
+	if err != nil {
+		log.Println(err)
+		sendMsg(p.ws, "Got invalid data for team assignment")
+		return false
+	}
+	thisMission.Votes[i] = extra.Vote
 
 	// this makes bots vote every time, not efficient but who cares
 	for i, player := range g.Players {
@@ -417,11 +458,11 @@ func (g *Resist) handleVote(cmd *ResistCmd) bool {
 				if g.Players[i].IsBot {
 					p := g.Players[i]
 					go func(bot *Player, v int) {
-						g.cmd<-&ResistCmd{
+						g.cmd<-&gamelib.Command{
 							PlayerId: bot.Uuid,
-							UserInput: &UserInput{
-								Type: msg_vote_mission, Vote: !bot.IsSpy, Version: v,
-							},
+							Type: msg_vote_mission,
+							Data: []byte(strconv.FormatBool(!bot.IsSpy)),
+							Version: v,
 						}
 					}(p, g.Version)
 				}
@@ -449,7 +490,7 @@ func (g *Resist) handleVote(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleMission(cmd *ResistCmd) bool {
+func (g *Resist) handleMission(cmd *gamelib.Command) bool {
 	p, i := Find(g.Players, cmd.PlayerId)
 
 	if g.Version != cmd.Version || g.State != state_mission || !p.OnMission {
@@ -457,12 +498,20 @@ func (g *Resist) handleMission(cmd *ResistCmd) bool {
 		return false
 	}
 
+	var extra *UserInput
+	err := json.Unmarshal(cmd.Data, extra)
+	if err != nil {
+		log.Println(err)
+		sendMsg(p.ws, "Got invalid data for team assignment")
+		return false
+	}
+
 	thisMission := g.Missions[g.CurrentMission]
-	if !p.IsSpy && cmd.Vote == false {
+	if !p.IsSpy && extra.Vote == false {
 		sendMsg(p.ws, "Resistance cannot vote to fail missions")
 		return false
 	}
-	thisMission.successVotes[i] = cmd.Vote
+	thisMission.successVotes[i] = extra.Vote
 
 	// voting is done
 	if len(thisMission.successVotes) == len(thisMission.Assignments) {
@@ -512,17 +561,25 @@ func (g *Resist) handleMission(cmd *ResistCmd) bool {
 	return true
 }
 
-func (g *Resist) handleName(cmd *ResistCmd) bool {
+func (g *Resist) handleName(cmd *gamelib.Command) bool {
 	p, _ := Find(g.Players, cmd.PlayerId)
 	if g.State != state_lobby && p.Name != "" {
 		sendMsg(p.ws, "Wait for the lobby to change your name again")
 		return false
 	}
 
-	if len(cmd.Name) > 8 {
-		p.Name = cmd.Name[0:8]
+	var extra *UserInput
+	err := json.Unmarshal(cmd.Data, extra)
+	if err != nil {
+		log.Println(err)
+		sendMsg(p.ws, "Got invalid data for team assignment")
+		return false
+	}
+
+	if len(extra.Name) > 8 {
+		p.Name = extra.Name[0:8]
 	} else {
-		p.Name = cmd.Name
+		p.Name = extra.Name
 	}
 
 	return true

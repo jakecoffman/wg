@@ -15,7 +15,7 @@ const (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(files))))
-	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(resistance.ProcessPlayerCommands)))
+	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(gamelib.ProcessPlayerCommands(resistance.NewGame))))
 	http.HandleFunc("/admin", resistance.HandleAdmin)
 	port := "8112"
 	log.Println("Serving http://localhost:" + port)

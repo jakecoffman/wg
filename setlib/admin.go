@@ -6,6 +6,7 @@ import (
 	"sort"
 	"html/template"
 	"log"
+	"github.com/jakecoffman/set-game/gamelib"
 )
 
 type info struct {
@@ -16,8 +17,8 @@ type info struct {
 
 func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 	response := []info{}
-	for _, id := range Games.Ids() {
-		game := Games.Get(id).(*Set)
+	for _, id := range gamelib.AllGames.Ids() {
+		game := gamelib.AllGames.Get(id).(*Set)
 		sets := game.FindSets()
 		compactSets := []string{}
 		for _, set := range sets {

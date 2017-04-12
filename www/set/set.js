@@ -18,7 +18,7 @@ ws.onopen = function (e) {
 };
 
 function join(id) {
-    ws.send(JSON.stringify({Type: "join", Join: id}));
+    ws.send(JSON.stringify({Type: "join", Data: id}));
 }
 
 var cards = document.getElementById('cards');
@@ -57,7 +57,7 @@ function selectHandler(location, node) {
             node.classList.add('selected');
         }
         if (selected.length === 3) {
-            ws.send(JSON.stringify({Type: "play", Play: selected, Version: version}));
+            ws.send(JSON.stringify({Type: "play", Data: selected, Version: version}));
             // request animation frame
             setTimeout(function(){
                 for (var s = 0; s < selected.length; s++) {

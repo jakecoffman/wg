@@ -345,7 +345,7 @@ func (g *Resist) handleStart(cmd *gamelib.Command) bool {
 	// assign secret roles to players (based on # of players)
 	{
 		numSpies := map[int]int{5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4}[len(g.Players)]
-		for i := range rand.Perm(numSpies) {
+		for _, i := range rand.Perm(numSpies) {
 			g.Players[i].IsSpy = true
 		}
 	}

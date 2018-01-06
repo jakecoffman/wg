@@ -18,32 +18,22 @@ type Connector interface {
 // WsConn is a websocket connection that implements Connector
 type wsConn struct {
 	conn *websocket.Conn
-	sendChan chan interface{}
 }
 
 func NewWsConn(ws *websocket.Conn) *wsConn {
 	conn := &wsConn{
 		conn: ws,
-		sendChan: make(chan interface{}),
 	}
-	go conn.sender()
 	return conn
 }
 
-func (c *wsConn) sender() {
-	for {
-		data := <-c.sendChan
-		if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
-			return
-		}
-		if err := websocket.JSON.Send(c.conn, data); err != nil {
-			return
-		}
-	}
-}
-
 func (c *wsConn) Send(v interface{}) {
-	c.sendChan <- v
+	if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return
+	}
+	if err := websocket.JSON.Send(c.conn, v); err != nil {
+		return
+	}
 }
 
 func (c *wsConn) Recv(v interface{}) error {
@@ -54,7 +44,6 @@ func (c *wsConn) Recv(v interface{}) error {
 }
 
 func (c *wsConn) Close() error {
-	close(c.sendChan)
 	return c.conn.Close()
 }
 

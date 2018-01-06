@@ -11,38 +11,38 @@ import (
 )
 
 type Set struct {
-	cmd          chan *gamelib.Command `json:"-"`
+	cmd chan *gamelib.Command `json:"-"`
 
-	Id           string
-	board        map[int]Card
-	rands        []int
-	cursor       int
+	Id     string
+	board  map[int]Card
+	rands  []int
+	cursor int
 
 	players      map[string]*Player
 	playerCursor int
 
-	Version      int
-	Created      time.Time
-	Updated      time.Time
+	Version int
+	Created time.Time
+	Updated time.Time
 }
 
 type Player struct {
-	ws    gamelib.Connector
-	Id    int
-	Score int
+	ws        gamelib.Connector
+	Id        int
+	Score     int
 	Connected bool
-	ip string
+	ip        string
 }
 
 func NewGame(id string) gamelib.Game {
 	g := &Set{
 		cmd: make(chan *gamelib.Command),
 
-		players: map[string]*Player{},
+		players:      map[string]*Player{},
 		playerCursor: 1,
-		board: map[int]Card{},
-		Id: id,
-		Created: time.Now(),
+		board:        map[int]Card{},
+		Id:           id,
+		Created:      time.Now(),
 	}
 	go g.run()
 	g.reset()
@@ -54,12 +54,12 @@ func (g *Set) Cmd(c *gamelib.Command) {
 }
 
 const (
-	cmd_join = "join"
-	cmd_leave = "leave"
+	cmd_join       = "join"
+	cmd_leave      = "leave"
 	cmd_disconnect = "disconnect"
-	cmd_play = "play"
-	cmd_nosets = "nosets"
-	cmd_stop = "stop"
+	cmd_play       = "play"
+	cmd_nosets     = "nosets"
+	cmd_stop       = "stop"
 )
 
 func (g *Set) run() {
@@ -120,7 +120,12 @@ func (g *Set) sendEverythingTo(ws gamelib.Connector) {
 		return
 	}
 
-	update := UpdateMsg{Type: "all", Updates: []Update{}, Players: g.SlicePlayers(), GameId: g.Id, Version: g.Version}
+	update := UpdateMsg{
+		Type:    "all",
+		Updates: []Update{},
+		Players: g.SlicePlayers(),
+		Version: g.Version,
+	}
 
 	// order is important when sending all because javascript is rebuilding DOM
 	for i := 0; i < len(g.board); i++ {
@@ -131,7 +136,12 @@ func (g *Set) sendEverythingTo(ws gamelib.Connector) {
 }
 
 func (g *Set) sendEveryoneEverything() {
-	update := &UpdateMsg{Type: "all", Updates: []Update{}, Players: g.SlicePlayers(), GameId: g.Id, Version: g.Version}
+	update := UpdateMsg{
+		Type:    "all",
+		Updates: []Update{},
+		Players: g.SlicePlayers(),
+		Version: g.Version,
+	}
 
 	// order is important when sending all because javascript is rebuilding DOM
 	for i := 0; i < len(g.board); i++ {
@@ -142,7 +152,18 @@ func (g *Set) sendEveryoneEverything() {
 }
 
 func (g *Set) sendMetaToEveryone() {
-	g.sendAll(&UpdateMsg{Type: "meta", Players: g.SlicePlayers(), GameId: g.Id, Version: g.Version})
+	msg := MetaMsg{
+		Type:    "meta",
+		Players: g.SlicePlayers(),
+		GameId:  g.Id,
+		Version: g.Version,
+	}
+	for _, player := range g.players {
+		if player.ws != nil {
+			msg.You = player.Id
+			player.ws.Send(msg)
+		}
+	}
 }
 
 func (g *Set) sendAll(msg interface{}) {
@@ -176,20 +197,19 @@ func (g *Set) dealmore(playerId string) {
 		return
 	}
 
-	g.board[len(g.board)] = deck[g.rands[g.cursor + 0]]
-	g.board[len(g.board)] = deck[g.rands[g.cursor + 1]]
-	g.board[len(g.board)] = deck[g.rands[g.cursor + 2]]
+	g.board[len(g.board)] = deck[g.rands[g.cursor+0]]
+	g.board[len(g.board)] = deck[g.rands[g.cursor+1]]
+	g.board[len(g.board)] = deck[g.rands[g.cursor+2]]
 	g.cursor += 3
 	g.Version += 1
-	update := &UpdateMsg{
-		Type: "update",
+	update := UpdateMsg{
+		Type:    "update",
 		Players: g.SlicePlayers(),
-		GameId: g.Id,
 		Version: g.Version,
 		Updates: []Update{
-			{Location: len(g.board) - 3, Card: g.board[len(g.board) - 3]},
-			{Location: len(g.board) - 2, Card: g.board[len(g.board) - 2]},
-			{Location: len(g.board) - 1, Card: g.board[len(g.board) - 1]},
+			{Location: len(g.board) - 3, Card: g.board[len(g.board)-3]},
+			{Location: len(g.board) - 2, Card: g.board[len(g.board)-2]},
+			{Location: len(g.board) - 1, Card: g.board[len(g.board)-1]},
 		},
 	}
 	g.sendAll(update)
@@ -204,12 +224,12 @@ func (g *Set) playone(cmd *gamelib.Command) {
 	}
 	if isSet(g.board[play[0]], g.board[play[1]], g.board[play[2]]) {
 		g.players[cmd.PlayerId].Score += 1
-		if (g.cursor == len(g.rands)) {
+		if g.cursor == len(g.rands) {
 			// out of cards
 			g.board[play[0]] = Card{Amount: -1}
 			g.board[play[1]] = Card{Amount: -1}
 			g.board[play[2]] = Card{Amount: -1}
-		} else if (len(g.board) > 12) {
+		} else if len(g.board) > 12 {
 			delete(g.board, play[0])
 			delete(g.board, play[1])
 			delete(g.board, play[2])
@@ -223,16 +243,15 @@ func (g *Set) playone(cmd *gamelib.Command) {
 			g.sendEveryoneEverything()
 			return
 		} else {
-			g.board[play[0]] = deck[g.rands[g.cursor + 0]]
-			g.board[play[1]] = deck[g.rands[g.cursor + 1]]
-			g.board[play[2]] = deck[g.rands[g.cursor + 2]]
+			g.board[play[0]] = deck[g.rands[g.cursor+0]]
+			g.board[play[1]] = deck[g.rands[g.cursor+1]]
+			g.board[play[2]] = deck[g.rands[g.cursor+2]]
 			g.cursor += 3
 		}
 		g.Version += 1
 		update := &UpdateMsg{
-			Type: "update",
+			Type:    "update",
 			Players: g.SlicePlayers(),
-			GameId: g.Id,
 			Version: g.Version,
 			Updates: []Update{
 				{Location: play[0], Card: g.board[play[0]]},
@@ -249,15 +268,15 @@ func (g *Set) playone(cmd *gamelib.Command) {
 
 func (g Set) Sets() string {
 	sets := g.FindSets()
-	str := fmt.Sprint(len(g.rands) - g.cursor, " left, ", len(sets), " sets:")
+	str := fmt.Sprint(len(g.rands)-g.cursor, " left, ", len(sets), " sets:")
 	for _, set := range sets {
-		str += fmt.Sprint(set[0] + 1, "-", g.board[set[0]], set[1] + 1, "-", g.board[set[1]], set[2] + 1, "-", g.board[set[2]])
+		str += fmt.Sprint(set[0]+1, "-", g.board[set[0]], set[1]+1, "-", g.board[set[1]], set[2]+1, "-", g.board[set[2]])
 	}
 	return str
 }
 
 func (g Set) FindSets() [][]int {
-	sets := [][]int{}
+	var sets [][]int
 	size := len(g.board)
 	var card1, card2, card3 Card
 
@@ -268,9 +287,9 @@ func (g Set) FindSets() [][]int {
 		index++
 	}
 
-	for i := 0; i < size - 2; i++ {
+	for i := 0; i < size-2; i++ {
 		card1 = g.board[boardIndex[i]]
-		for j := i + 1; j < size - 1; j++ {
+		for j := i + 1; j < size-1; j++ {
 			card2 = g.board[boardIndex[j]]
 			for k := j + 1; k < size; k++ {
 				card3 = g.board[boardIndex[k]]
@@ -285,7 +304,7 @@ func (g Set) FindSets() [][]int {
 }
 
 func (g *Set) SlicePlayers() []*Player {
-	players := []*Player{}
+	var players []*Player
 	for _, p := range g.players {
 		players = append(players, p)
 	}
@@ -301,7 +320,7 @@ func (g *Set) SlicePlayersAdmin() interface{} {
 		*Player
 		Addr string
 	}
-	players := []*playa{}
+	var players []*playa
 	for _, p := range g.players {
 		players = append(players, &playa{Player: p, Addr: p.ip})
 	}
@@ -324,7 +343,6 @@ func (g Set) NumConns() int {
 type UpdateMsg struct {
 	Type    string
 	Updates []Update
-	GameId  string
 	Players []*Player
 	Version int
 }
@@ -332,4 +350,12 @@ type UpdateMsg struct {
 type Update struct {
 	Location int
 	Card     Card
+}
+
+type MetaMsg struct {
+	Type    string
+	GameId  string
+	Players []*Player
+	Version int
+	You     int
 }

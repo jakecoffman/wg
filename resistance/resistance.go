@@ -12,13 +12,13 @@ import (
 )
 
 type Resist struct {
-	cmd            chan *gamelib.Command `json:"-"`
+	cmd chan *gamelib.Command `json:"-"`
 
-	Id             string
+	Id string
 
-	Players        []*Player
-	playerCursor   int
-	Leader         int
+	Players      []*Player
+	playerCursor int
+	Leader       int
 
 	State          string
 	Missions       []*Mission
@@ -37,7 +37,7 @@ type Player struct {
 	Name      string
 	Connected bool
 	Ip        string `json:"-"`
-	IsSpy     bool `json:"-"`
+	IsSpy     bool   `json:"-"`
 	IsBot     bool
 	IsReady   bool
 	IsLeader  bool
@@ -61,13 +61,13 @@ type Mission struct {
 	Success      bool         // success/fail result
 	NumFails     int          // number of fail votes on mission
 
-	Complete     bool         // just a flag to tell if the mission has finished
+	Complete bool // just a flag to tell if the mission has finished
 }
 
 type History struct {
-	Mission int
+	Mission     int
 	Assignments []int
-	Votes map[int]bool
+	Votes       map[int]bool
 }
 
 func NewMissions(slots []int) []*Mission {
@@ -83,10 +83,10 @@ func NewGame(id string) gamelib.Game {
 	g := &Resist{
 		cmd: make(chan *gamelib.Command),
 
-		Players: []*Player{},
+		Players:      []*Player{},
 		playerCursor: 1,
-		Id: id,
-		Created: time.Now(),
+		Id:           id,
+		Created:      time.Now(),
 	}
 	go g.run()
 	g.reset()
@@ -203,8 +203,8 @@ type UpdateMsg struct {
 }
 
 type secret struct {
-	Id int
-	Spies []int
+	Id                           int
+	Spies                        []int
 	IsReady, IsLeader, OnMission bool
 }
 
@@ -229,7 +229,7 @@ func (g *Resist) sendEveryoneEverything() {
 
 type MsgMsg struct {
 	Type string
-	Msg string
+	Msg  string
 }
 
 func sendMsg(c gamelib.Connector, msg string) {
@@ -339,11 +339,12 @@ func (g *Resist) handleStart(cmd *gamelib.Command) bool {
 	// assign secret roles to players (based on # of players)
 	{
 		numSpies := map[int]int{5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4}[len(g.Players)]
-		for _, i := range rand.Perm(len(g.Players)) {
+		walk := rand.Perm(len(g.Players))
+		for i, j := range walk {
 			if i >= numSpies {
 				break
 			}
-			g.Players[i].IsSpy = true
+			g.Players[j].IsSpy = true
 		}
 	}
 	// init missions based on amount of players
@@ -455,7 +456,7 @@ func (g *Resist) handleVote(cmd *gamelib.Command) bool {
 				if g.Players[i].IsBot {
 					p := g.Players[i]
 					go func(bot *Player, v int) {
-						g.cmd<-&gamelib.Command{
+						g.cmd <- &gamelib.Command{
 							PlayerId: bot.Uuid,
 							Type:     cmdVoteMission,
 							Data:     []byte(strconv.FormatBool(!bot.IsSpy)),

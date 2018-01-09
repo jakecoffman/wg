@@ -22,10 +22,10 @@ func GenId() string {
 }
 
 const (
-	cmd_disconnect = "disconnect"
-	cmd_join = "join"
-	cmd_leave = "leave"
-	cmd_stop = "stop"
+	cmdDisconnect = "disconnect"
+	cmdJoin       = "join"
+	cmdLeave      = "leave"
+	cmdStop       = "stop"
 )
 
 type Command struct {
@@ -36,14 +36,14 @@ type Command struct {
 	Data json.RawMessage
 }
 
-func ProcessPlayerCommands(NewGame func(string) Game) func(Connector, string) {
+func ProcessPlayerCommands(AllGames *Games, NewGame func(string) Game) func(Connector, string) {
 	return func(ws Connector, playerId string) {
 		input := &Command{}
 		var game Game
 
 		defer func() {
 			if game != nil {
-				game.Cmd(&Command{Type: cmd_disconnect, PlayerId: playerId})
+				game.Cmd(&Command{Type: cmdDisconnect, PlayerId: playerId})
 			}
 		}()
 
@@ -55,9 +55,9 @@ func ProcessPlayerCommands(NewGame func(string) Game) func(Connector, string) {
 			input.Ws = ws
 			input.PlayerId = playerId
 			switch input.Type {
-			case cmd_join:
+			case cmdJoin:
 				if game != nil {
-					game.Cmd(&Command{Type: cmd_leave, PlayerId: playerId})
+					game.Cmd(&Command{Type: cmdLeave, PlayerId: playerId})
 					game = nil
 				}
 
@@ -78,7 +78,7 @@ func ProcessPlayerCommands(NewGame func(string) Game) func(Connector, string) {
 					AllGames.Set(id, game)
 				}
 				game.Cmd(input)
-			case cmd_stop:
+			case cmdStop:
 			// players can't stop the game goroutine
 			default:
 				if game != nil {

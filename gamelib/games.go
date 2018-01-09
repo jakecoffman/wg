@@ -4,8 +4,6 @@ import (
 	"sync"
 )
 
-var AllGames = NewGames()
-
 type Game interface {
 	Cmd(*Command)
 }

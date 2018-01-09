@@ -11,13 +11,15 @@ func init() {
 	go func() {
 		for {
 			time.Sleep(1 * time.Minute)
-			for _, id := range gamelib.AllGames.Ids() {
-				game := gamelib.AllGames.Get(id).(*Set)
+			for _, id := range AllGames.Ids() {
+				game := AllGames.Get(id).(*Set)
 				if time.Now().Sub(game.Updated).Hours() > 24 && game.NumConns() == 0 {
-					game.Cmd(&gamelib.Command{Type: cmd_stop})
-					gamelib.AllGames.Delete(id)
+					game.Cmd(&gamelib.Command{Type: cmdStop})
+					AllGames.Delete(id)
 				}
 			}
 		}
 	}()
 }
+
+var AllGames = gamelib.NewGames()

@@ -54,12 +54,12 @@ func (g *Set) Cmd(c *gamelib.Command) {
 }
 
 const (
-	cmd_join       = "join"
-	cmd_leave      = "leave"
-	cmd_disconnect = "disconnect"
-	cmd_play       = "play"
-	cmd_nosets     = "nosets"
-	cmd_stop       = "stop"
+	cmdJoin       = "join"
+	cmdLeave      = "leave"
+	cmdDisconnect = "disconnect"
+	cmdPlay       = "play"
+	cmdNosets     = "nosets"
+	cmdStop       = "stop"
 )
 
 func (g *Set) run() {
@@ -67,7 +67,7 @@ func (g *Set) run() {
 	for {
 		cmd = <-g.cmd
 		switch cmd.Type {
-		case cmd_join:
+		case cmdJoin:
 			var player *Player
 			var ok bool
 			if player, ok = g.players[cmd.PlayerId]; !ok {
@@ -81,17 +81,17 @@ func (g *Set) run() {
 			player.ip = player.ws.Request().Header.Get("X-Forwarded-For")
 			g.sendEverythingTo(cmd.Ws)
 			g.sendMetaToEveryone()
-		case cmd_leave:
+		case cmdLeave:
 			delete(g.players, cmd.PlayerId)
 			g.sendMetaToEveryone()
-		case cmd_disconnect:
+		case cmdDisconnect:
 			p := g.players[cmd.PlayerId]
 			if p != nil {
 				g.players[cmd.PlayerId].ws = nil
 				g.players[cmd.PlayerId].Connected = false
 				g.sendMetaToEveryone()
 			}
-		case cmd_nosets:
+		case cmdNosets:
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
 				log.Println("Race condition averted")
@@ -99,7 +99,7 @@ func (g *Set) run() {
 				continue
 			}
 			g.dealmore(cmd.PlayerId)
-		case cmd_play:
+		case cmdPlay:
 			if cmd.Version != g.Version {
 				// prevent losing points due to race
 				log.Println("Race condition averted")
@@ -107,7 +107,7 @@ func (g *Set) run() {
 				continue
 			}
 			g.playone(cmd)
-		case cmd_stop:
+		case cmdStop:
 			log.Println("Stopping set game", g.Id)
 			return
 		}

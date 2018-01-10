@@ -18,7 +18,7 @@ type Resist struct {
 
 	Players      []*Player
 	playerCursor int
-	Leader       int
+	Leader       int // Leader is the position of the leader in the Players list
 
 	State          string
 	Missions       []*Mission
@@ -44,6 +44,7 @@ type Player struct {
 	OnMission bool
 }
 
+// Find returns the player object and the position they are in
 func Find(players []*Player, uuid string) (*Player, int) {
 	for i, player := range players {
 		if player.Uuid == uuid {
@@ -247,12 +248,12 @@ func (g *Resist) handleJoin(cmd *gamelib.Command) bool {
 	if i == -1 {
 		// player was not here before
 		if g.State != stateLobby {
-			sendMsg(player.ws, "Can't join game in progress")
+			sendMsg(cmd.Ws, "Can't join game in progress")
 			return false
 		}
 		if len(g.Players) >= 10 {
 			// can't have more than 10 players
-			sendMsg(player.ws, "Can't have more than 10 players")
+			sendMsg(cmd.Ws, "Can't have more than 10 players")
 			return false
 		}
 		player = &Player{Uuid: cmd.PlayerId, Id: g.playerCursor}
@@ -315,9 +316,21 @@ func (g *Resist) handleReady(cmd *gamelib.Command) bool {
 }
 
 func (g *Resist) handleStart(cmd *gamelib.Command) bool {
-	if g.Version != cmd.Version || g.State != stateLobby || len(g.Players) < 5 {
+	if g.Version != cmd.Version {
+		sendMsg(cmd.Ws, "Someone else started the game first")
 		return false
 	}
+
+	if g.State != stateLobby {
+		sendMsg(cmd.Ws, "Illegal state")
+		return false
+	}
+
+	if len(g.Players) < 5 || len(g.Players) > 10 {
+		sendMsg(cmd.Ws, "Need 5-10 players to start the game")
+		return false
+	}
+
 	g.State = stateTeambuilding
 	g.CurrentMission = 0
 	g.NumFailed = 0
@@ -364,8 +377,7 @@ func (g *Resist) handleStart(cmd *gamelib.Command) bool {
 
 func (g *Resist) handleAddBot(cmd *gamelib.Command) bool {
 	if len(g.Players) >= 10 {
-		p, _ := Find(g.Players, cmd.PlayerId)
-		sendMsg(p.ws, "Can't have more than 10 players")
+		sendMsg(cmd.Ws, "Can't have more than 10 players")
 		return false
 	}
 	player := &Player{Uuid: uuid.New().String(), Id: g.playerCursor, IsBot: true}
@@ -381,13 +393,12 @@ func (g *Resist) handleRemoveBot(cmd *gamelib.Command) bool {
 			return true
 		}
 	}
-	p, _ := Find(g.Players, cmd.PlayerId)
-	sendMsg(p.ws, "These aren't the bot's you're looking for...")
+	sendMsg(cmd.Ws, "These aren't the bot's you're looking for...")
 	return false
 }
 
 func (g *Resist) handleAssignTeam(cmd *gamelib.Command) bool {
-	p, i := Find(g.Players, cmd.PlayerId)
+	_, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != stateTeambuilding || g.Leader != i {
 		return false
 	}
@@ -395,12 +406,12 @@ func (g *Resist) handleAssignTeam(cmd *gamelib.Command) bool {
 	err := json.Unmarshal(cmd.Data, &assignment)
 	if err != nil {
 		log.Println(err)
-		sendMsg(p.ws, "Got invalid data for team assignment")
+		sendMsg(cmd.Ws, "Got invalid data for team assignment")
 		return false
 	}
 	thisMission := g.Missions[g.CurrentMission]
 	if len(assignment) != thisMission.Slots {
-		sendMsg(p.ws, fmt.Sprint("Number of assignments needs to be ", thisMission.Slots, " but got ", len(assignment)))
+		sendMsg(cmd.Ws, fmt.Sprint("Number of assignments needs to be ", thisMission.Slots, " but got ", len(assignment)))
 		return false
 	}
 	thisMission.Assignments = assignment
@@ -413,7 +424,7 @@ func (g *Resist) handleAssignTeam(cmd *gamelib.Command) bool {
 }
 
 func (g *Resist) handleVote(cmd *gamelib.Command) bool {
-	p, i := Find(g.Players, cmd.PlayerId)
+	_, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != stateTeamvoting {
 		log.Println(g.Version, cmd.Version, g.State)
 		return false
@@ -423,7 +434,7 @@ func (g *Resist) handleVote(cmd *gamelib.Command) bool {
 	err := json.Unmarshal(cmd.Data, &vote)
 	if err != nil {
 		log.Println(err)
-		sendMsg(p.ws, "Got invalid data for team assignment")
+		sendMsg(cmd.Ws, "Got invalid data for team assignment")
 		return false
 	}
 	thisMission.Votes[i] = vote

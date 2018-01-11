@@ -564,6 +564,9 @@ func (g *Resist) handleMission(cmd *gamelib.Command) bool {
 			// game is not over, assign the next leader
 			g.State = stateTeambuilding
 			g.Leader += 1
+			if g.Leader >= len(g.Players) {
+				g.Leader = 0
+			}
 			g.Players[g.Leader].IsLeader = true
 		}
 	}

@@ -10,11 +10,13 @@ import (
 	"encoding/json"
 )
 
+const DEV = false
+
 type Set struct {
 	cmd chan *gamelib.Command `json:"-"`
 
 	Id     string
-	board  map[int]Card
+	board  []Card
 	rands  []int
 	cursor int
 
@@ -40,7 +42,7 @@ func NewGame(id string) gamelib.Game {
 
 		players:      map[string]*Player{},
 		playerCursor: 1,
-		board:        map[int]Card{},
+		board:        []Card{},
 		Id:           id,
 		Created:      time.Now(),
 	}
@@ -65,6 +67,9 @@ const (
 func (g *Set) run() {
 	var cmd *gamelib.Command
 	for {
+		if DEV {
+			g.sendEveryoneCheats()
+		}
 		cmd = <-g.cmd
 		switch cmd.Type {
 		case cmdJoin:
@@ -151,6 +156,19 @@ func (g *Set) sendEveryoneEverything() {
 	g.sendAll(update)
 }
 
+func (g *Set) sendEveryoneCheats() {
+	sets := g.FindSets()
+
+	msg := map[string]interface{}{"Type": "cheat"}
+	if len(sets) > 0 {
+		msg["Sets"] = sets[0]
+	} else {
+		return
+	}
+
+	g.sendAll(msg)
+}
+
 func (g *Set) sendMetaToEveryone() {
 	msg := MetaMsg{
 		Type:    "meta",
@@ -176,9 +194,9 @@ func (g *Set) sendAll(msg interface{}) {
 
 func (g *Set) reset() {
 	g.rands = rand.Perm(len(deck))
-	g.board = map[int]Card{}
+	g.board = []Card{}
 	for g.cursor = 0; g.cursor < 12; g.cursor++ {
-		g.board[g.cursor] = deck[g.rands[g.cursor]]
+		g.board = append(g.board, deck[g.rands[g.cursor]])
 	}
 }
 
@@ -197,9 +215,9 @@ func (g *Set) dealmore(playerId string) {
 		return
 	}
 
-	g.board[len(g.board)] = deck[g.rands[g.cursor+0]]
-	g.board[len(g.board)] = deck[g.rands[g.cursor+1]]
-	g.board[len(g.board)] = deck[g.rands[g.cursor+2]]
+	g.board = append(g.board, deck[g.rands[g.cursor+0]])
+	g.board = append(g.board, deck[g.rands[g.cursor+1]])
+	g.board = append(g.board, deck[g.rands[g.cursor+2]])
 	g.cursor += 3
 	g.Version += 1
 	update := UpdateMsg{
@@ -222,53 +240,46 @@ func (g *Set) playone(cmd *gamelib.Command) {
 		log.Println("error reading play data", err)
 		return
 	}
-	if isSet(g.board[play[0]], g.board[play[1]], g.board[play[2]]) {
-		g.players[cmd.PlayerId].Score += 1
-		if g.cursor == len(g.rands) {
-			// out of cards
-			g.board[play[0]] = Card{Amount: -1}
-			g.board[play[1]] = Card{Amount: -1}
-			g.board[play[2]] = Card{Amount: -1}
-		} else if len(g.board) > 12 {
-			delete(g.board, play[0])
-			delete(g.board, play[1])
-			delete(g.board, play[2])
-			newBoard := map[int]Card{}
-			i := 0
-			for _, card := range g.board {
-				newBoard[i] = card
-				i++
-			}
-			g.board = newBoard
-			g.sendEveryoneEverything()
-			return
-		} else {
-			g.board[play[0]] = deck[g.rands[g.cursor+0]]
-			g.board[play[1]] = deck[g.rands[g.cursor+1]]
-			g.board[play[2]] = deck[g.rands[g.cursor+2]]
-			g.cursor += 3
-		}
-		g.Version += 1
-		update := &UpdateMsg{
-			Type:    "update",
-			Players: g.SlicePlayers(),
-			Version: g.Version,
-			Updates: []Update{
-				{Location: play[0], Card: g.board[play[0]]},
-				{Location: play[1], Card: g.board[play[1]]},
-				{Location: play[2], Card: g.board[play[2]]},
-			}}
-		g.sendAll(update)
-	} else {
+	if !isSet(g.board[play[0]], g.board[play[1]], g.board[play[2]]) {
 		log.Println("Not a set...")
 		g.players[cmd.PlayerId].Score -= 1
 		g.sendMetaToEveryone()
+		return
 	}
+	// it's a set
+	g.players[cmd.PlayerId].Score += 1
+	g.Version += 1
+
+	// just remove, don't deal
+	if g.cursor == len(g.rands) || len(g.board) > 12 {
+		sort.Ints(play)
+		g.board = append(g.board[:play[2]], g.board[play[2]+1:]...)
+		g.board = append(g.board[:play[1]], g.board[play[1]+1:]...)
+		g.board = append(g.board[:play[0]], g.board[play[0]+1:]...)
+		g.sendEveryoneEverything()
+		return
+	}
+
+	// normal: replace cards with cards from the deck
+	g.board[play[0]] = deck[g.rands[g.cursor]]
+	g.board[play[1]] = deck[g.rands[g.cursor+1]]
+	g.board[play[2]] = deck[g.rands[g.cursor+2]]
+	g.cursor += 3
+	update := &UpdateMsg{
+		Type:    "update",
+		Players: g.SlicePlayers(),
+		Version: g.Version,
+		Updates: []Update{
+			{Location: play[0], Card: g.board[play[0]]},
+			{Location: play[1], Card: g.board[play[1]]},
+			{Location: play[2], Card: g.board[play[2]]},
+		}}
+	g.sendAll(update)
 }
 
 func (g Set) Sets() string {
 	sets := g.FindSets()
-	str := fmt.Sprint(len(g.rands)-g.cursor, " left, ", len(sets), " sets:")
+	str := fmt.Sprint(len(g.rands)-len(g.board), " left, ", len(sets), " sets:")
 	for _, set := range sets {
 		str += fmt.Sprint(set[0]+1, "-", g.board[set[0]], set[1]+1, "-", g.board[set[1]], set[2]+1, "-", g.board[set[2]])
 	}

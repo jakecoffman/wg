@@ -1,4 +1,4 @@
-package gamelib
+package wg
 
 import (
 	"golang.org/x/net/websocket"

@@ -1,8 +1,8 @@
 package setlib
 
 import (
+	"github.com/jakecoffman/wg"
 	"time"
-	"github.com/jakecoffman/set-game/gamelib"
 )
 
 func init() {
@@ -14,7 +14,7 @@ func init() {
 			for _, id := range AllGames.Ids() {
 				game := AllGames.Get(id).(*Set)
 				if time.Now().Sub(game.Updated).Hours() > 24 && game.NumConns() == 0 {
-					game.Cmd(&gamelib.Command{Type: cmdStop})
+					game.Cmd(&wg.Command{Type: cmdStop})
 					AllGames.Delete(id)
 				}
 			}
@@ -22,4 +22,4 @@ func init() {
 	}()
 }
 
-var AllGames = gamelib.NewGames()
+var AllGames = wg.NewGames()

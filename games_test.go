@@ -1,9 +1,9 @@
-package gamelib
+package wg
 
 import "testing"
 
 type fakeGame struct {
-	Id string
+	Id       string
 	Commands []*Command
 }
 

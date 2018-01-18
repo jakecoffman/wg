@@ -1,12 +1,12 @@
-package gamelib
+package wg
 
 import (
-	"testing"
 	"net/http"
 	"net/http/httptest"
+	"testing"
 )
 
-type testHandler struct {}
+type testHandler struct{}
 
 func (t *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
@@ -14,9 +14,9 @@ func (t *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type fakeConn struct {
 	Connector
-	req *http.Request
+	req       *http.Request
 	wasClosed bool
-	sentMsg interface{}
+	sentMsg   interface{}
 }
 
 func (c *fakeConn) Send(msg interface{}) {

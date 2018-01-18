@@ -1,18 +1,18 @@
 package resistance
 
 import (
-	"github.com/jakecoffman/set-game/gamelib"
-	"log"
-	"time"
-	"github.com/google/uuid"
-	"math/rand"
-	"fmt"
 	"encoding/json"
+	"fmt"
+	"github.com/google/uuid"
+	"github.com/jakecoffman/wg"
+	"log"
+	"math/rand"
 	"strconv"
+	"time"
 )
 
 type Resist struct {
-	cmd chan *gamelib.Command `json:"-"`
+	cmd chan *wg.Command `json:"-"`
 
 	Id string
 
@@ -31,7 +31,7 @@ type Resist struct {
 }
 
 type Player struct {
-	ws        gamelib.Connector
+	ws        wg.Connector
 	Uuid      string `json:"-"`
 	Id        int
 	Name      string
@@ -80,9 +80,9 @@ func NewMissions(slots []int) []*Mission {
 	return missions
 }
 
-func NewGame(id string) gamelib.Game {
+func NewGame(id string) wg.Game {
 	g := &Resist{
-		cmd: make(chan *gamelib.Command),
+		cmd: make(chan *wg.Command),
 
 		Players:      []*Player{},
 		playerCursor: 1,
@@ -110,7 +110,7 @@ func (g *Resist) reset() {
 	}
 }
 
-func (g *Resist) Cmd(c *gamelib.Command) {
+func (g *Resist) Cmd(c *wg.Command) {
 	g.cmd <- c
 }
 
@@ -146,7 +146,7 @@ const (
 )
 
 func (g *Resist) run() {
-	var cmd *gamelib.Command
+	var cmd *wg.Command
 	var update bool
 	for {
 		// handle the case where a bot is leader
@@ -233,7 +233,7 @@ type MsgMsg struct {
 	Msg  string
 }
 
-func sendMsg(c gamelib.Connector, msg string) {
+func sendMsg(c wg.Connector, msg string) {
 	c.Send(&MsgMsg{Type: "msg", Msg: msg})
 }
 
@@ -243,7 +243,7 @@ func (g *Resist) resetReadies() {
 	}
 }
 
-func (g *Resist) handleJoin(cmd *gamelib.Command) bool {
+func (g *Resist) handleJoin(cmd *wg.Command) bool {
 	player, i := Find(g.Players, cmd.PlayerId)
 	if i == -1 {
 		// player was not here before
@@ -266,7 +266,7 @@ func (g *Resist) handleJoin(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleLeave(cmd *gamelib.Command) bool {
+func (g *Resist) handleLeave(cmd *wg.Command) bool {
 	for i, player := range g.Players {
 		if player.Uuid == cmd.PlayerId {
 			g.Players = append(g.Players[0:i], g.Players[i+1:]...)
@@ -276,7 +276,7 @@ func (g *Resist) handleLeave(cmd *gamelib.Command) bool {
 	return false
 }
 
-func (g *Resist) handleDisconnect(cmd *gamelib.Command) bool {
+func (g *Resist) handleDisconnect(cmd *wg.Command) bool {
 	player, i := Find(g.Players, cmd.PlayerId)
 	if i == -1 {
 		log.Println("Couldn't find player", cmd.PlayerId)
@@ -287,7 +287,7 @@ func (g *Resist) handleDisconnect(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleReady(cmd *gamelib.Command) bool {
+func (g *Resist) handleReady(cmd *wg.Command) bool {
 	allReady := true
 	for _, p := range g.Players {
 		if p.Uuid == cmd.PlayerId {
@@ -315,7 +315,7 @@ func (g *Resist) handleReady(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleStart(cmd *gamelib.Command) bool {
+func (g *Resist) handleStart(cmd *wg.Command) bool {
 	if g.Version != cmd.Version {
 		sendMsg(cmd.Ws, "Someone else started the game first")
 		return false
@@ -375,7 +375,7 @@ func (g *Resist) handleStart(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleAddBot(cmd *gamelib.Command) bool {
+func (g *Resist) handleAddBot(cmd *wg.Command) bool {
 	if len(g.Players) >= 10 {
 		sendMsg(cmd.Ws, "Can't have more than 10 players")
 		return false
@@ -386,7 +386,7 @@ func (g *Resist) handleAddBot(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleRemoveBot(cmd *gamelib.Command) bool {
+func (g *Resist) handleRemoveBot(cmd *wg.Command) bool {
 	for i, p := range g.Players {
 		if p.IsBot {
 			g.Players = append(g.Players[0:i], g.Players[i+1:]...)
@@ -397,7 +397,7 @@ func (g *Resist) handleRemoveBot(cmd *gamelib.Command) bool {
 	return false
 }
 
-func (g *Resist) handleAssignTeam(cmd *gamelib.Command) bool {
+func (g *Resist) handleAssignTeam(cmd *wg.Command) bool {
 	_, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != stateTeambuilding || g.Leader != i {
 		return false
@@ -423,7 +423,7 @@ func (g *Resist) handleAssignTeam(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleVote(cmd *gamelib.Command) bool {
+func (g *Resist) handleVote(cmd *wg.Command) bool {
 	_, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != stateTeamvoting {
 		log.Println(g.Version, cmd.Version, g.State)
@@ -467,7 +467,7 @@ func (g *Resist) handleVote(cmd *gamelib.Command) bool {
 				if g.Players[i].IsBot {
 					p := g.Players[i]
 					go func(bot *Player, v int) {
-						g.cmd <- &gamelib.Command{
+						g.cmd <- &wg.Command{
 							PlayerId: bot.Uuid,
 							Type:     cmdVoteMission,
 							Data:     []byte(strconv.FormatBool(!bot.IsSpy)),
@@ -499,7 +499,7 @@ func (g *Resist) handleVote(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleMission(cmd *gamelib.Command) bool {
+func (g *Resist) handleMission(cmd *wg.Command) bool {
 	p, i := Find(g.Players, cmd.PlayerId)
 
 	if g.Version != cmd.Version || g.State != stateMission || !p.OnMission {
@@ -573,7 +573,7 @@ func (g *Resist) handleMission(cmd *gamelib.Command) bool {
 	return true
 }
 
-func (g *Resist) handleName(cmd *gamelib.Command) bool {
+func (g *Resist) handleName(cmd *wg.Command) bool {
 	p, _ := Find(g.Players, cmd.PlayerId)
 	if g.State != stateLobby && p.Name != "" {
 		sendMsg(p.ws, "Wait for the lobby to change your name again")

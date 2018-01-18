@@ -1,19 +1,19 @@
 package setlib
 
 import (
-	"math/rand"
-	"log"
+	"encoding/json"
 	"fmt"
+	"github.com/jakecoffman/wg"
+	"log"
+	"math/rand"
 	"sort"
 	"time"
-	"github.com/jakecoffman/set-game/gamelib"
-	"encoding/json"
 )
 
 const DEV = false
 
 type Set struct {
-	cmd chan *gamelib.Command `json:"-"`
+	cmd chan *wg.Command `json:"-"`
 
 	Id     string
 	board  []Card
@@ -29,16 +29,16 @@ type Set struct {
 }
 
 type Player struct {
-	ws        gamelib.Connector
+	ws        wg.Connector
 	Id        int
 	Score     int
 	Connected bool
 	ip        string
 }
 
-func NewGame(id string) gamelib.Game {
+func NewGame(id string) wg.Game {
 	g := &Set{
-		cmd: make(chan *gamelib.Command),
+		cmd: make(chan *wg.Command),
 
 		players:      map[string]*Player{},
 		playerCursor: 1,
@@ -51,7 +51,7 @@ func NewGame(id string) gamelib.Game {
 	return g
 }
 
-func (g *Set) Cmd(c *gamelib.Command) {
+func (g *Set) Cmd(c *wg.Command) {
 	g.cmd <- c
 }
 
@@ -65,7 +65,7 @@ const (
 )
 
 func (g *Set) run() {
-	var cmd *gamelib.Command
+	var cmd *wg.Command
 	for {
 		if DEV {
 			g.sendEveryoneCheats()
@@ -120,7 +120,7 @@ func (g *Set) run() {
 	}
 }
 
-func (g *Set) sendEverythingTo(ws gamelib.Connector) {
+func (g *Set) sendEverythingTo(ws wg.Connector) {
 	if ws == nil {
 		return
 	}
@@ -233,7 +233,7 @@ func (g *Set) dealmore(playerId string) {
 	g.sendAll(update)
 }
 
-func (g *Set) playone(cmd *gamelib.Command) {
+func (g *Set) playone(cmd *wg.Command) {
 	var play []int
 	err := json.Unmarshal(cmd.Data, &play)
 	if err != nil {

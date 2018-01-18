@@ -1,11 +1,11 @@
-package gamelib
+package wg
 
 import (
-	"golang.org/x/net/websocket"
-	"net/http"
 	"github.com/google/uuid"
-	"time"
+	"golang.org/x/net/websocket"
 	"log"
+	"net/http"
+	"time"
 )
 
 type PlayerCommandHandler func(Connector, string)

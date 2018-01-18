@@ -1,11 +1,11 @@
 package resistance
 
 import (
+	"github.com/jakecoffman/wg"
 	"time"
-	"github.com/jakecoffman/set-game/gamelib"
 )
 
-var Games = gamelib.NewGames()
+var Games = wg.NewGames()
 
 func init() {
 	// check if games are abandoned, and if so remove them
@@ -15,7 +15,7 @@ func init() {
 			for _, id := range Games.Ids() {
 				game := Games.Get(id).(*Resist)
 				if time.Now().Sub(game.Updated).Hours() > 24 /* && game.NumConns() == 0*/ {
-					game.Cmd(&gamelib.Command{Type: cmdStop})
+					game.Cmd(&wg.Command{Type: cmdStop})
 					Games.Delete(id)
 				}
 			}
@@ -23,4 +23,4 @@ func init() {
 	}()
 }
 
-var AllGames = gamelib.NewGames()
+var AllGames = wg.NewGames()

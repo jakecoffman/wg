@@ -1,24 +1,24 @@
 package main
 
 import (
-	"log"
+	"github.com/jakecoffman/wg"
+	"github.com/jakecoffman/wg/setlib"
 	"golang.org/x/net/websocket"
-	"github.com/jakecoffman/set-game/setlib"
+	"log"
 	"net/http"
-	"github.com/jakecoffman/set-game/gamelib"
 )
 
 const (
-	live_ws = "wss://set.jakecoffman.com/ws"
+	live_ws     = "wss://set.jakecoffman.com/ws"
 	live_origin = "https://set.jakecoffman.com"
-	test_ws = "ws://127.0.0.1:8111/ws"
+	test_ws     = "ws://127.0.0.1:8111/ws"
 	test_origin = "http://127.0.0.1:8111"
 )
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	http.Handle("/ws", websocket.Handler(gamelib.WsHandler(gamelib.ProcessPlayerCommands(setlib.NewGame))))
+	http.Handle("/ws", websocket.Handler(wg.WsHandler(wg.ProcessPlayerCommands(setlib.NewGame))))
 	go func() {
 		log.Fatal(http.ListenAndServe(":8111", nil))
 	}()
@@ -40,11 +40,11 @@ func main() {
 
 	log.Println("Sent message")
 
-	msg := <- incoming
+	msg := <-incoming
 
 	log.Printf("%#v\n", msg)
 
-	msg = <- incoming
+	msg = <-incoming
 
 	log.Printf("%#v\n", msg)
 
@@ -53,7 +53,7 @@ func main() {
 func read(ws *websocket.Conn, c chan *setlib.UpdateMsg) {
 	for {
 		var message *setlib.UpdateMsg
-		 err := websocket.JSON.Receive(ws, &message)
+		err := websocket.JSON.Receive(ws, &message)
 		if err != nil {
 			log.Fatal(err)
 		}

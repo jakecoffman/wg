@@ -1,10 +1,10 @@
-package gamelib
+package wg
 
 import (
-	"math/rand"
-	"time"
 	"encoding/json"
 	"log"
+	"math/rand"
+	"time"
 )
 
 const letterBytes = "1234567890"
@@ -30,10 +30,10 @@ const (
 
 type Command struct {
 	PlayerId string
-	Ws Connector
-	Type string
-	Version int
-	Data json.RawMessage
+	Ws       Connector
+	Type     string
+	Version  int
+	Data     json.RawMessage
 }
 
 func ProcessPlayerCommands(AllGames *Games, NewGame func(string) Game) func(Connector, string) {

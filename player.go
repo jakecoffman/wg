@@ -36,32 +36,32 @@ type Command struct {
 	Data     json.RawMessage
 }
 
-func ProcessPlayerCommands(AllGames *Games, NewGame func(string) Game) func(Connector, string) {
+func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
 	return func(ws Connector, playerId string) {
-		input := &Command{}
-		var game Game
+		cmd := &Command{}
+		var game *Game
 
 		defer func() {
 			if game != nil {
-				game.Cmd(&Command{Type: cmdDisconnect, PlayerId: playerId})
+				game.Cmd <- &Command{Type: cmdDisconnect, PlayerId: playerId}
 			}
 		}()
 
 		var id string
 		for {
-			if err := ws.Recv(input); err != nil {
+			if err := ws.Recv(cmd); err != nil {
 				return
 			}
-			input.Ws = ws
-			input.PlayerId = playerId
-			switch input.Type {
+			cmd.Ws = ws
+			cmd.PlayerId = playerId
+			switch cmd.Type {
 			case cmdJoin:
 				if game != nil {
-					game.Cmd(&Command{Type: cmdLeave, PlayerId: playerId})
+					game.Cmd <- &Command{Type: cmdLeave, PlayerId: playerId}
 					game = nil
 				}
 
-				if err := json.Unmarshal(input.Data, &id); err != nil {
+				if err := json.Unmarshal(cmd.Data, &id); err != nil {
 					log.Println("Couldn't decode join code", err)
 					continue
 				}
@@ -77,12 +77,12 @@ func ProcessPlayerCommands(AllGames *Games, NewGame func(string) Game) func(Conn
 					game = NewGame(id)
 					AllGames.Set(id, game)
 				}
-				game.Cmd(input)
+				game.Cmd <- cmd
 			case cmdStop:
-			// players can't stop the game goroutine
+				// players can't stop the game goroutine
 			default:
 				if game != nil {
-					game.Cmd(input)
+					game.Cmd <- cmd
 				}
 			}
 		}

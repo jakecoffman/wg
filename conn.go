@@ -2,6 +2,7 @@ package wg
 
 import (
 	"golang.org/x/net/websocket"
+	"log"
 	"net/http"
 	"time"
 )
@@ -29,9 +30,11 @@ func NewWsConn(ws *websocket.Conn) *wsConn {
 
 func (c *wsConn) Send(v interface{}) {
 	if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Println(err)
 		return
 	}
 	if err := websocket.JSON.Send(c.conn, v); err != nil {
+		log.Println(err)
 		return
 	}
 }

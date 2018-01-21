@@ -13,9 +13,8 @@ import (
 const DEV = false
 
 type Set struct {
-	cmd chan *wg.Command `json:"-"`
+	*wg.Game
 
-	Id     string
 	board  []Card
 	rands  []int
 	cursor int
@@ -36,23 +35,17 @@ type Player struct {
 	ip        string
 }
 
-func NewGame(id string) wg.Game {
+func NewGame(id string) *wg.Game {
 	g := &Set{
-		cmd: make(chan *wg.Command),
-
 		players:      map[string]*Player{},
 		playerCursor: 1,
 		board:        []Card{},
-		Id:           id,
 		Created:      time.Now(),
 	}
+	g.Game = wg.NewGame(g, id)
 	go g.run()
 	g.reset()
-	return g
-}
-
-func (g *Set) Cmd(c *wg.Command) {
-	g.cmd <- c
+	return g.Game
 }
 
 const (
@@ -70,7 +63,7 @@ func (g *Set) run() {
 		if DEV {
 			g.sendEveryoneCheats()
 		}
-		cmd = <-g.cmd
+		cmd = <-g.Cmd
 		switch cmd.Type {
 		case cmdJoin:
 			var player *Player
@@ -339,16 +332,6 @@ func (g *Set) SlicePlayersAdmin() interface{} {
 		return players[i].Score >= players[j].Score
 	})
 	return players
-}
-
-func (g Set) NumConns() int {
-	sum := 0
-	for _, p := range g.players {
-		if p.ws != nil {
-			sum += 1
-		}
-	}
-	return sum
 }
 
 type UpdateMsg struct {

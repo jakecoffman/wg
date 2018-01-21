@@ -12,9 +12,7 @@ import (
 )
 
 type Resist struct {
-	cmd chan *wg.Command `json:"-"`
-
-	Id string
+	*wg.Game
 
 	Players      []*Player
 	playerCursor int
@@ -25,9 +23,6 @@ type Resist struct {
 	CurrentMission int
 	History        []*History
 	NumFailed      int
-	Version        int
-	Created        time.Time `json:"-"`
-	Updated        time.Time `json:"-"`
 }
 
 type Player struct {
@@ -80,18 +75,15 @@ func NewMissions(slots []int) []*Mission {
 	return missions
 }
 
-func NewGame(id string) wg.Game {
+func NewGame(id string) *wg.Game {
 	g := &Resist{
-		cmd: make(chan *wg.Command),
-
 		Players:      []*Player{},
 		playerCursor: 1,
-		Id:           id,
-		Created:      time.Now(),
 	}
+	g.Game = wg.NewGame(g, id)
 	go g.run()
 	g.reset()
-	return g
+	return g.Game
 }
 
 func (g *Resist) reset() {
@@ -108,10 +100,6 @@ func (g *Resist) reset() {
 		p.OnMission = false
 		p.IsReady = false
 	}
-}
-
-func (g *Resist) Cmd(c *wg.Command) {
-	g.cmd <- c
 }
 
 // states
@@ -159,7 +147,7 @@ func (g *Resist) run() {
 			g.State = stateTeamvoting
 			g.sendEveryoneEverything()
 		}
-		cmd = <-g.cmd
+		cmd = <-g.Cmd
 
 		switch cmd.Type {
 		case cmdJoin:
@@ -467,7 +455,7 @@ func (g *Resist) handleVote(cmd *wg.Command) bool {
 				if g.Players[i].IsBot {
 					p := g.Players[i]
 					go func(bot *Player, v int) {
-						g.cmd <- &wg.Command{
+						g.Cmd <- &wg.Command{
 							PlayerId: bot.Uuid,
 							Type:     cmdVoteMission,
 							Data:     []byte(strconv.FormatBool(!bot.IsSpy)),

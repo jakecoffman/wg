@@ -6,7 +6,13 @@ import (
 	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
+	"time"
+	"math/rand"
 )
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)

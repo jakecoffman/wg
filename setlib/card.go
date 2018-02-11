@@ -1,10 +1,5 @@
 package setlib
 
-import (
-	"time"
-	"math/rand"
-)
-
 type Card struct {
 	Shape   string `json:"s"`
 	Pattern string `json:"p"`
@@ -13,16 +8,12 @@ type Card struct {
 }
 
 var deck []Card
+var shapes = []string{"p", "n", "d"}
+var patterns = []string{"h", "s", "z"}
+var colors = []string{"r", "p", "g"}
+var amount = []int{1, 2, 3}
 
 func init() {
-	rand.Seed(time.Now().Unix())
-
-	shapes := []string{"p", "n", "d"}
-	patterns := []string{"h", "s", "z"}
-	colors := []string{"r", "p", "g"}
-	amount := []int{1, 2, 3}
-
-	deck = []Card{}
 	for _, s := range shapes {
 		for _, p := range patterns {
 			for _, c := range colors {

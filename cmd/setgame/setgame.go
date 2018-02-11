@@ -3,11 +3,16 @@ package main
 import (
 	"log"
 	"net/http"
-
 	"github.com/jakecoffman/wg"
 	"github.com/jakecoffman/wg/setlib"
 	"golang.org/x/net/websocket"
+	"time"
+	"math/rand"
 )
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)

@@ -11,6 +11,10 @@ import (
 type Connector interface {
 	Send(v interface{})
 	Recv(v interface{}) error
+
+	SendRaw(v []byte)
+	RecvRaw(v []byte) error
+
 	Close() error
 
 	Request() *http.Request
@@ -39,11 +43,29 @@ func (c *wsConn) Send(v interface{}) {
 	}
 }
 
+func (c *wsConn) SendRaw(v []byte) {
+	if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Println(err)
+		return
+	}
+	if err := websocket.Message.Send(c.conn, v); err != nil {
+		log.Println(err)
+		return
+	}
+}
+
 func (c *wsConn) Recv(v interface{}) error {
 	if err := c.conn.SetReadDeadline(time.Now().Add(10 * time.Minute)); err != nil {
 		return err
 	}
 	return websocket.JSON.Receive(c.conn, v)
+}
+
+func (c *wsConn) RecvRaw(v []byte) error {
+	if err := c.conn.SetReadDeadline(time.Now().Add(10 * time.Minute)); err != nil {
+		return err
+	}
+	return websocket.Message.Receive(c.conn, v)
 }
 
 func (c *wsConn) Close() error {

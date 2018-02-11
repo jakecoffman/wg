@@ -69,9 +69,13 @@ func (g *Games) Get(id string) *Game {
 	return g.games[id]
 }
 
-func (g *Games) Set(id string, game *Game) {
+func (g *Games) Set(game *Game) {
+	if game.Id == "" {
+		// this is programmer error, ok with panic
+		panic("game needs an ID")
+	}
 	g.Lock()
-	g.games[id] = game
+	g.games[game.Id] = game
 	g.Unlock()
 }
 

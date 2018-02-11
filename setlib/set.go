@@ -2,7 +2,6 @@ package setlib
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/jakecoffman/wg"
 	"log"
 	"math/rand"
@@ -53,64 +52,64 @@ const (
 	cmdLeave      = "leave"
 	cmdDisconnect = "disconnect"
 	cmdPlay       = "play"
-	cmdNosets     = "nosets"
+	cmdNoSets     = "nosets"
 	cmdStop       = "stop"
 )
 
 func (g *Set) run() {
 	var cmd *wg.Command
 	for {
-		if DEV {
-			g.sendEveryoneCheats()
-		}
 		cmd = <-g.Cmd
 		switch cmd.Type {
 		case cmdJoin:
-			var player *Player
-			var ok bool
-			if player, ok = g.players[cmd.PlayerId]; !ok {
-				// player was not here before, create
-				player = &Player{Id: g.playerCursor}
-				g.players[cmd.PlayerId] = player
-				g.playerCursor += 1
-			}
-			player.ws = cmd.Ws
-			player.Connected = true
-			player.ip = player.ws.Request().Header.Get("X-Forwarded-For")
-			g.sendEverythingTo(cmd.Ws)
-			g.sendMetaToEveryone()
+			g.join(cmd)
 		case cmdLeave:
-			delete(g.players, cmd.PlayerId)
-			g.sendMetaToEveryone()
+			g.leave(cmd)
 		case cmdDisconnect:
-			p := g.players[cmd.PlayerId]
-			if p != nil {
-				g.players[cmd.PlayerId].ws = nil
-				g.players[cmd.PlayerId].Connected = false
-				g.sendMetaToEveryone()
-			}
-		case cmdNosets:
-			if cmd.Version != g.Version {
-				// prevent losing points due to race
-				log.Println("Race condition averted")
-				g.sendMetaToEveryone()
-				continue
-			}
-			g.dealmore(cmd.PlayerId)
+			g.disconnect(cmd)
+		case cmdNoSets:
+			g.noSets(cmd)
 		case cmdPlay:
-			if cmd.Version != g.Version {
-				// prevent losing points due to race
-				log.Println("Race condition averted")
-				g.sendMetaToEveryone()
-				continue
-			}
-			g.playone(cmd)
+			g.play(cmd)
 		case cmdStop:
 			log.Println("Stopping set game", g.Id)
 			return
 		}
 		g.Updated = time.Now()
+		if DEV {
+			g.sendEveryoneCheats()
+		}
 	}
+}
+
+func (g *Set) disconnect(cmd *wg.Command) {
+	p := g.players[cmd.PlayerId]
+	if p != nil {
+		g.players[cmd.PlayerId].ws = nil
+		g.players[cmd.PlayerId].Connected = false
+		g.sendMetaToEveryone()
+	}
+}
+
+func (g *Set) leave(cmd *wg.Command) {
+	delete(g.players, cmd.PlayerId)
+	g.sendMetaToEveryone()
+}
+
+func (g *Set) join(cmd *wg.Command) {
+	var player *Player
+	var ok bool
+	if player, ok = g.players[cmd.PlayerId]; !ok {
+		// player was not here before, create
+		player = &Player{Id: g.playerCursor}
+		g.players[cmd.PlayerId] = player
+		g.playerCursor += 1
+	}
+	player.ws = cmd.Ws
+	player.Connected = true
+	player.ip = player.ws.Request().Header.Get("X-Forwarded-For")
+	g.sendEverythingTo(cmd.Ws)
+	g.sendMetaToEveryone()
 }
 
 func (g *Set) sendEverythingTo(ws wg.Connector) {
@@ -193,7 +192,14 @@ func (g *Set) reset() {
 	}
 }
 
-func (g *Set) dealmore(playerId string) {
+func (g *Set) noSets(cmd *wg.Command) {
+	if cmd.Version != g.Version {
+		// prevent losing points due to race
+		log.Println("Race condition averted")
+		g.sendMetaToEveryone()
+		return
+	}
+	playerId := cmd.PlayerId
 	sets := g.FindSets()
 	if len(sets) > 0 {
 		g.players[playerId].Score -= len(sets)
@@ -226,7 +232,13 @@ func (g *Set) dealmore(playerId string) {
 	g.sendAll(update)
 }
 
-func (g *Set) playone(cmd *wg.Command) {
+func (g *Set) play(cmd *wg.Command) {
+	if cmd.Version != g.Version {
+		// prevent losing points due to race
+		log.Println("Race condition averted")
+		g.sendMetaToEveryone()
+		return
+	}
 	var play []int
 	err := json.Unmarshal(cmd.Data, &play)
 	if err != nil {
@@ -268,15 +280,6 @@ func (g *Set) playone(cmd *wg.Command) {
 			{Location: play[2], Card: g.board[play[2]]},
 		}}
 	g.sendAll(update)
-}
-
-func (g Set) Sets() string {
-	sets := g.FindSets()
-	str := fmt.Sprint(len(g.rands)-len(g.board), " left, ", len(sets), " sets:")
-	for _, set := range sets {
-		str += fmt.Sprint(set[0]+1, "-", g.board[set[0]], set[1]+1, "-", g.board[set[1]], set[2]+1, "-", g.board[set[2]])
-	}
-	return str
 }
 
 func (g Set) FindSets() [][]int {

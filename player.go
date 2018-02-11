@@ -4,14 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
-	"time"
 )
 
 const letterBytes = "1234567890"
-
-func init() {
-	rand.Seed(time.Now().Unix())
-}
 
 func GenId() string {
 	b := make([]byte, 6)
@@ -69,13 +64,13 @@ func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
 				// new
 				if id == "" {
 					id = GenId()
-					AllGames.Set(id, NewGame(id))
+					AllGames.Set(NewGame(id))
 				}
 
 				if game = AllGames.Get(id); game == nil {
 					id = GenId()
 					game = NewGame(id)
-					AllGames.Set(id, game)
+					AllGames.Set(game)
 				}
 				game.Cmd <- cmd
 			case cmdStop:

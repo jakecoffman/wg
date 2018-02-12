@@ -37,6 +37,7 @@ type Player struct {
 	IsReady   bool
 	IsLeader  bool
 	OnMission bool
+	suspicion int
 }
 
 // Find returns the player object and the position they are in
@@ -94,6 +95,7 @@ func (g *Resist) reset() {
 	g.CurrentMission = 0
 	g.Leader = 0
 	for _, p := range g.Players {
+		p.suspicion = 0
 		p.IsSpy = false
 		p.IsLeader = false
 		p.IsReady = false
@@ -137,15 +139,9 @@ func (g *Resist) run() {
 	var cmd *wg.Command
 	var update bool
 	for {
-		// handle the case where a bot is leader
+		// handle the case where a bot is now a leader
 		if g.State == stateTeambuilding && g.Players[g.Leader].IsBot {
-			thisMission := g.Missions[g.CurrentMission]
-			thisMission.Assignments = rand.Perm(len(g.Players))[0:thisMission.Slots]
-			for _, i := range thisMission.Assignments {
-				g.Players[i].OnMission = true
-			}
-			g.State = stateTeamvoting
-			g.sendEveryoneEverything()
+			g.botLeader()
 		}
 		cmd = <-g.Cmd
 
@@ -185,6 +181,54 @@ func (g *Resist) run() {
 	}
 }
 
+func (g *Resist) botLeader() {
+	thisMission := g.Missions[g.CurrentMission]
+	if g.Players[g.Leader].IsSpy {
+		// assign one spy with lowest suspicion, then pick from low suspicion
+		var spies []int
+		var resistance []int
+		for _, id := range rand.Perm(len(g.Players)) {
+			if g.Players[id].IsSpy {
+				spies = insertInOrder(spies, g.Players, id)
+			} else {
+				resistance = insertInOrder(resistance, g.Players, id)
+			}
+		}
+		thisMission.Assignments = append(thisMission.Assignments, spies[0])
+		for i := 0; i < thisMission.Slots-1; i++ {
+			thisMission.Assignments = append(thisMission.Assignments, resistance[i])
+		}
+	} else {
+		// assign from the lowest suspicion first
+		var order []int
+		for _, id := range rand.Perm(len(g.Players)) {
+			order = insertInOrder(order, g.Players, id)
+		}
+		rand.Perm(thisMission.Slots)
+		thisMission.Assignments = order[:thisMission.Slots]
+	}
+	for _, i := range thisMission.Assignments {
+		g.Players[i].OnMission = true
+	}
+	g.State = stateTeamvoting
+	g.sendEveryoneEverything()
+}
+
+func insertInOrder(order []int, players []*Player, id int) []int {
+	var inserted bool
+	for i, j := range order {
+		if players[id].suspicion < players[j].suspicion {
+			inserted = true
+			order = append(order[:i], append([]int{id}, order[i+1:]...)...)
+			break
+		}
+	}
+	if !inserted {
+		order = append(order, id)
+	}
+	return order
+}
+
 type UpdateMsg struct {
 	Type   string
 	Update *Resist
@@ -208,7 +252,7 @@ func (g *Resist) sendEveryoneEverything() {
 		if p.ws != nil {
 			msg := &UpdateMsg{Type: "all", Update: g}
 			msg.You = &secret{Id: p.Id, IsReady: p.IsReady, IsLeader: p.IsLeader, OnMission: p.OnMission}
-			if p.IsSpy {
+			if g.State == stateResistanceWin || g.State == stateSpywin || p.IsSpy {
 				msg.You.Spies = spies
 			}
 			p.ws.Send(msg)
@@ -223,6 +267,14 @@ type MsgMsg struct {
 
 func sendMsg(c wg.Connector, msg string) {
 	c.Send(&MsgMsg{Type: "msg", Msg: msg})
+}
+
+func (g *Resist) sendMsgAll(msg string) {
+	for _, p := range g.Players {
+		if p.ws != nil {
+			p.ws.Send(&MsgMsg{Type: "msg", Msg: msg})
+		}
+	}
 }
 
 func (g *Resist) resetReadies() {
@@ -411,6 +463,7 @@ func (g *Resist) handleAssignTeam(cmd *wg.Command) bool {
 	return true
 }
 
+// handleVote is voting for the away team
 func (g *Resist) handleVote(cmd *wg.Command) bool {
 	_, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != stateTeamvoting {
@@ -438,6 +491,7 @@ func (g *Resist) handleVote(cmd *wg.Command) bool {
 		}
 	}
 
+	// everyone has voted
 	if len(thisMission.Votes) == len(g.Players) {
 		g.History = append(g.History, &History{Mission: g.CurrentMission, Assignments: thisMission.Assignments, Votes: thisMission.Votes})
 		g.Version += 1
@@ -447,6 +501,7 @@ func (g *Resist) handleVote(cmd *wg.Command) bool {
 				yeas += 1
 			}
 		}
+		// the mission is on!
 		if yeas > (len(g.Players) / 2) {
 			g.State = stateMission
 			g.NumFailed = 0
@@ -454,6 +509,7 @@ func (g *Resist) handleVote(cmd *wg.Command) bool {
 			for _, i := range g.Missions[g.CurrentMission].Assignments {
 				if g.Players[i].IsBot {
 					p := g.Players[i]
+					// have to do this in a goroutine since it blocks
 					go func(bot *Player, v int) {
 						g.Cmd <- &wg.Command{
 							PlayerId: bot.Uuid,
@@ -556,6 +612,18 @@ func (g *Resist) handleMission(cmd *wg.Command) bool {
 				g.Leader = 0
 			}
 			g.Players[g.Leader].IsLeader = true
+			// update the suspicion level of the bots of the players that were on the mission
+			if thisMission.Success {
+				for _, i := range thisMission.Assignments {
+					g.Players[i].suspicion--
+				}
+				g.sendMsgAll("Mission successful! 🙌")
+			} else {
+				for _, i := range thisMission.Assignments {
+					g.Players[i].suspicion++
+				}
+				g.sendMsgAll("Mission failed! 💥")
+			}
 		}
 	}
 	return true

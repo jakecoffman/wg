@@ -107,7 +107,7 @@ func (g *Set) join(cmd *wg.Command) {
 	}
 	player.ws = cmd.Ws
 	player.Connected = true
-	player.ip = player.ws.Request().Header.Get("X-Forwarded-For")
+	player.ip = player.ws.Ip()
 	g.sendEverythingTo(cmd.Ws)
 	g.sendMetaToEveryone()
 }

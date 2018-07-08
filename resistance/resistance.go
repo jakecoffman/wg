@@ -340,18 +340,14 @@ func (g *Resist) handleReady(cmd *wg.Command) bool {
 		}
 	}
 	if allReady {
+		g.Version += 1
 		switch g.State {
-		case stateLobby:
-			g.resetReadies()
-			g.reset()
-			g.handleStart(cmd)
 		case stateSpywin:
 			fallthrough
 		case stateResistanceWin:
 			g.reset()
 		default:
 			log.Println("Error: everyone voted ready but I am in state", g.State)
-			g.resetReadies()
 		}
 	}
 	return true

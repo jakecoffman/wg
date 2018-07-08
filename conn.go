@@ -3,8 +3,8 @@ package wg
 import (
 	"golang.org/x/net/websocket"
 	"log"
-	"net/http"
 	"time"
+	"net/http"
 )
 
 // Connector wraps connections so tests are easier
@@ -17,7 +17,8 @@ type Connector interface {
 
 	Close() error
 
-	Request() *http.Request
+	Ip() string
+	Cookie(string) (*http.Cookie, error)
 }
 
 // WsConn is a websocket connection that implements Connector
@@ -72,6 +73,10 @@ func (c *wsConn) Close() error {
 	return c.conn.Close()
 }
 
-func (c *wsConn) Request() *http.Request {
-	return c.conn.Request()
+func (c *wsConn) Ip() string {
+	return c.conn.Request().Header.Get("X-Forwarded-For")
+}
+
+func (c *wsConn) Cookie(name string) (*http.Cookie, error) {
+	return c.conn.Request().Cookie(name)
 }

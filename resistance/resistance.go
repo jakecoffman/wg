@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"strconv"
 	"time"
+	"runtime/debug"
+	"sort"
 )
 
 type Resist struct {
@@ -137,6 +139,16 @@ const (
 
 func (g *Resist) run() {
 	var cmd *wg.Command
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Game crashed", r)
+			log.Printf("State: %#v\n", g)
+			log.Println("Last command received:", cmd)
+			debug.PrintStack()
+		}
+	}()
+
 	var update bool
 	for {
 		// handle the case where a bot is now a leader
@@ -189,44 +201,34 @@ func (g *Resist) botLeader() {
 		var resistance []int
 		for _, id := range rand.Perm(len(g.Players)) {
 			if g.Players[id].IsSpy {
-				spies = insertInOrder(spies, g.Players, id)
+				spies = append(spies, id)
 			} else {
-				resistance = insertInOrder(resistance, g.Players, id)
+				resistance = append(resistance, id)
 			}
 		}
+		sort.Slice(spies, func(i, j int) bool {
+			return g.Players[i].suspicion < g.Players[j].suspicion
+		})
+		sort.Slice(resistance, func(i, j int) bool {
+			return g.Players[i].suspicion < g.Players[j].suspicion
+		})
 		thisMission.Assignments = append(thisMission.Assignments, spies[0])
 		for i := 0; i < thisMission.Slots-1; i++ {
 			thisMission.Assignments = append(thisMission.Assignments, resistance[i])
 		}
 	} else {
-		// assign from the lowest suspicion first
-		var order []int
-		for _, id := range rand.Perm(len(g.Players)) {
-			order = insertInOrder(order, g.Players, id)
-		}
-		rand.Perm(thisMission.Slots)
-		thisMission.Assignments = order[:thisMission.Slots]
+		// bot isn't spy, assign from the lowest suspicion first
+		ordered := rand.Perm(len(g.Players))
+		sort.Slice(ordered, func(i, j int) bool {
+			return g.Players[i].suspicion < g.Players[j].suspicion
+		})
+		thisMission.Assignments = ordered[:thisMission.Slots]
 	}
 	for _, i := range thisMission.Assignments {
 		g.Players[i].OnMission = true
 	}
 	g.State = stateTeamvoting
 	g.sendEveryoneEverything()
-}
-
-func insertInOrder(order []int, players []*Player, id int) []int {
-	var inserted bool
-	for i, j := range order {
-		if players[id].suspicion < players[j].suspicion {
-			inserted = true
-			order = append(order[:i], append([]int{id}, order[i+1:]...)...)
-			break
-		}
-	}
-	if !inserted {
-		order = append(order, id)
-	}
-	return order
 }
 
 type UpdateMsg struct {
@@ -302,7 +304,7 @@ func (g *Resist) handleJoin(cmd *wg.Command) bool {
 	}
 	player.ws = cmd.Ws
 	player.Connected = true
-	player.Ip = player.ws.Request().Header.Get("X-Forwarded-For")
+	player.Ip = player.ws.Ip()
 	return true
 }
 
@@ -340,9 +342,9 @@ func (g *Resist) handleReady(cmd *wg.Command) bool {
 	if allReady {
 		switch g.State {
 		case stateLobby:
-			// TODO move start logic down here
-			g.State = stateTeambuilding
 			g.resetReadies()
+			g.reset()
+			g.handleStart(cmd)
 		case stateSpywin:
 			fallthrough
 		case stateResistanceWin:
@@ -467,7 +469,6 @@ func (g *Resist) handleAssignTeam(cmd *wg.Command) bool {
 func (g *Resist) handleVote(cmd *wg.Command) bool {
 	_, i := Find(g.Players, cmd.PlayerId)
 	if g.Version != cmd.Version || g.State != stateTeamvoting {
-		log.Println(g.Version, cmd.Version, g.State)
 		return false
 	}
 	thisMission := g.Missions[g.CurrentMission]
@@ -492,52 +493,54 @@ func (g *Resist) handleVote(cmd *wg.Command) bool {
 	}
 
 	// everyone has voted
-	if len(thisMission.Votes) == len(g.Players) {
-		g.History = append(g.History, &History{Mission: g.CurrentMission, Assignments: thisMission.Assignments, Votes: thisMission.Votes})
-		g.Version += 1
-		yeas := 0
-		for _, vote := range thisMission.Votes {
-			if vote {
-				yeas += 1
+	if len(thisMission.Votes) != len(g.Players) {
+		return false
+	}
+
+	g.History = append(g.History, &History{Mission: g.CurrentMission, Assignments: thisMission.Assignments, Votes: thisMission.Votes})
+	g.Version += 1
+	yeas := 0
+	for _, vote := range thisMission.Votes {
+		if vote {
+			yeas += 1
+		}
+	}
+	// the mission is on!
+	if yeas > (len(g.Players) / 2) {
+		g.State = stateMission
+		g.NumFailed = 0
+		// make the bots pre-vote on the mission
+		for _, i := range g.Missions[g.CurrentMission].Assignments {
+			if g.Players[i].IsBot {
+				p := g.Players[i]
+				// have to do this in a goroutine since it blocks
+				go func(bot *Player, v int) {
+					g.Cmd <- &wg.Command{
+						PlayerId: bot.Uuid,
+						Type:     cmdVoteMission,
+						Data:     []byte(strconv.FormatBool(!bot.IsSpy)),
+						Version:  v,
+					}
+				}(p, g.Version)
 			}
 		}
-		// the mission is on!
-		if yeas > (len(g.Players) / 2) {
-			g.State = stateMission
-			g.NumFailed = 0
-			// make the bots pre-vote on the mission
-			for _, i := range g.Missions[g.CurrentMission].Assignments {
-				if g.Players[i].IsBot {
-					p := g.Players[i]
-					// have to do this in a goroutine since it blocks
-					go func(bot *Player, v int) {
-						g.Cmd <- &wg.Command{
-							PlayerId: bot.Uuid,
-							Type:     cmdVoteMission,
-							Data:     []byte(strconv.FormatBool(!bot.IsSpy)),
-							Version:  v,
-						}
-					}(p, g.Version)
-				}
-			}
+	} else {
+		g.NumFailed += 1
+		if g.NumFailed == 5 {
+			g.State = stateSpywin
 		} else {
-			g.NumFailed += 1
-			if g.NumFailed == 5 {
-				g.State = stateSpywin
-			} else {
-				g.State = stateTeambuilding
-				g.Players[g.Leader].IsLeader = false
-				g.Leader += 1
-				if g.Leader >= len(g.Players) {
-					g.Leader = 0
-				}
-				g.Players[g.Leader].IsLeader = true
-				thisMission.Assignments = []int{}
-				thisMission.Votes = map[int]bool{}
+			g.State = stateTeambuilding
+			g.Players[g.Leader].IsLeader = false
+			g.Leader += 1
+			if g.Leader >= len(g.Players) {
+				g.Leader = 0
 			}
-			for _, p := range g.Players {
-				p.OnMission = false
-			}
+			g.Players[g.Leader].IsLeader = true
+			thisMission.Assignments = []int{}
+			thisMission.Votes = map[int]bool{}
+		}
+		for _, p := range g.Players {
+			p.OnMission = false
 		}
 	}
 	return true
@@ -547,7 +550,6 @@ func (g *Resist) handleMission(cmd *wg.Command) bool {
 	p, i := Find(g.Players, cmd.PlayerId)
 
 	if g.Version != cmd.Version || g.State != stateMission || !p.OnMission {
-		log.Println(g.Version, cmd.Version, g.State, p.OnMission)
 		return false
 	}
 
@@ -567,64 +569,73 @@ func (g *Resist) handleMission(cmd *wg.Command) bool {
 	thisMission.successVotes[i] = vote
 
 	// voting is done
-	if len(thisMission.successVotes) == len(thisMission.Assignments) {
-		g.Version += 1
-		g.CurrentMission += 1
-		g.Players[g.Leader].IsLeader = false
-		if g.Leader >= len(g.Players) {
-			g.Leader = 0
+	if len(thisMission.successVotes) != len(thisMission.Assignments) {
+		return true
+	}
+
+	g.Version += 1
+	g.CurrentMission += 1
+	g.Players[g.Leader].IsLeader = false
+	if g.Leader >= len(g.Players) {
+		g.Leader = 0
+	}
+	for _, p := range g.Players {
+		p.OnMission = false
+	}
+	thisMission.Complete = true
+	// figure out if successful or not
+	thisMission.Success = true
+	for _, vote := range thisMission.successVotes {
+		if vote == false {
+			thisMission.Success = false
+			thisMission.NumFails += 1
 		}
-		for _, p := range g.Players {
-			p.OnMission = false
-		}
-		thisMission.Complete = true
-		// figure out if successful or not
-		thisMission.Success = true
-		for _, vote := range thisMission.successVotes {
-			if vote == false {
-				thisMission.Success = false
-				thisMission.NumFails += 1
-			}
-		}
-		// check end game by counting up number of successful/failed missions
-		succeeds := 0
-		fails := 0
-		for _, m := range g.Missions {
-			if m.Complete {
-				if m.Success {
-					succeeds += 1
-				} else {
-					fails += 1
-				}
-			}
-		}
-		if succeeds >= 3 {
-			g.State = stateResistanceWin
-			g.resetReadies()
-		} else if fails >= 3 {
-			g.State = stateSpywin
-			g.resetReadies()
-		} else {
-			// game is not over, assign the next leader
-			g.State = stateTeambuilding
-			g.Leader += 1
-			if g.Leader >= len(g.Players) {
-				g.Leader = 0
-			}
-			g.Players[g.Leader].IsLeader = true
-			// update the suspicion level of the bots of the players that were on the mission
-			if thisMission.Success {
-				for _, i := range thisMission.Assignments {
-					g.Players[i].suspicion--
-				}
-				g.sendMsgAll("Mission successful! 🙌")
+	}
+	// check end game by counting up number of successful/failed missions
+	succeeds := 0
+	fails := 0
+	for _, m := range g.Missions {
+		if m.Complete {
+			if m.Success {
+				succeeds += 1
 			} else {
-				for _, i := range thisMission.Assignments {
-					g.Players[i].suspicion++
-				}
-				g.sendMsgAll("Mission failed! 💥")
+				fails += 1
 			}
 		}
+	}
+	if succeeds >= 3 {
+		g.State = stateResistanceWin
+		g.resetReadies()
+		return true
+	}
+	if fails >= 3 {
+		g.State = stateSpywin
+		g.resetReadies()
+		return true
+	}
+
+	if g.CurrentMission == len(g.Missions) {
+		panic("Somehow")
+	}
+
+	// game is not over, assign the next leader
+	g.State = stateTeambuilding
+	g.Leader += 1
+	if g.Leader >= len(g.Players) {
+		g.Leader = 0
+	}
+	g.Players[g.Leader].IsLeader = true
+	// update the suspicion level of the bots of the players that were on the mission
+	if thisMission.Success {
+		for _, i := range thisMission.Assignments {
+			g.Players[i].suspicion--
+		}
+		g.sendMsgAll("Mission successful! 🙌")
+	} else {
+		for _, i := range thisMission.Assignments {
+			g.Players[i].suspicion++
+		}
+		g.sendMsgAll("Mission failed! 💥")
 	}
 	return true
 }
@@ -651,4 +662,9 @@ func (g *Resist) handleName(cmd *wg.Command) bool {
 	}
 
 	return true
+}
+
+func (g *Resist) String() string {
+	b, _ := json.Marshal(g)
+	return string(b)
 }

@@ -28,8 +28,8 @@ func (c *fakeConn) Close() error {
 	return nil
 }
 
-func (c *fakeConn) Request() *http.Request {
-	return c.req
+func (c *fakeConn) Ip() string {
+	return ""
 }
 
 func TestWsHandler(t *testing.T) {

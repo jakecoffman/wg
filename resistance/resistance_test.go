@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"log"
 	"time"
+	"fmt"
 )
 
 func TestResistance(t *testing.T) {
@@ -17,21 +18,18 @@ func TestResistance(t *testing.T) {
 	const player1 = "1"
 	p1Conn := wg.NewFakeConn(player1)
 
-	// new game
-	game := &Resist{
-		Players:      []*Player{},
-		playerCursor: 1,
-	}
-	game.Game = wg.NewGame(game, gameId)
-	go game.run()
-	game.reset()
+	game := NewGame(gameId)
+	resistance := game.Class.(*Resist)
 
-	game.Cmd <- &wg.Command{player1, p1Conn, cmdJoin, game.Version, nil}
-	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, game.Version, nil}
-	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, game.Version, nil}
-	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, game.Version, nil}
-	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, game.Version, nil}
-	game.Cmd <- &wg.Command{player1, p1Conn, cmdStart, game.Version, nil}
+	game.Cmd <- &wg.Command{player1, p1Conn, cmdJoin, resistance.Version, nil}
+	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, resistance.Version, nil}
+	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, resistance.Version, nil}
+	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, resistance.Version, nil}
+	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, resistance.Version, nil}
+	game.Cmd <- &wg.Command{player1, p1Conn, cmdStart, resistance.Version, nil}
+
+	false := []byte("false")
+	true := []byte("true")
 
 	var wins int
 	for wins < 1000 {
@@ -44,35 +42,36 @@ func TestResistance(t *testing.T) {
 			}
 		}
 
-		// let the game goroutine go, probably should improve this with locking
+		// let the resistance goroutine go, probably should improve this with locking
 		time.Sleep(1*time.Millisecond)
 
-		switch game.State {
+		switch resistance.State {
 		case stateTeambuilding:
-			assignment := rand.Perm(5)[:game.Missions[game.CurrentMission].Slots]
+			assignment := rand.Perm(5)[:resistance.Missions[resistance.CurrentMission].Slots]
 			b, _ := json.Marshal(assignment)
 			game.Cmd <- &wg.Command{player1, p1Conn, cmdAssign, game.Version, b}
 		case stateTeamvoting:
 			if rand.Intn(2) == 0 {
-				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteTeam, game.Version, []byte("false")}
+				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteTeam, game.Version, false}
 			} else {
-				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteTeam, game.Version, []byte("true")}
+				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteTeam, game.Version, true}
 			}
 		case stateMission:
 			if rand.Intn(2) == 0 {
-				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteMission, game.Version, []byte("false")}
+				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteMission, game.Version, false}
 			} else {
-				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteMission, game.Version, []byte("true")}
+				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteMission, game.Version, true}
 			}
 		case stateSpywin:
 			fallthrough
 		case stateResistanceWin:
 			wins++
+			fmt.Println(wins)
 			game.Cmd <- &wg.Command{player1, p1Conn, cmdReady, game.Version, nil}
 		case stateLobby:
 			game.Cmd <- &wg.Command{player1, p1Conn, cmdStart, game.Version, nil}
 		default:
-			log.Fatal("ERROR:", game.State)
+			log.Fatal("ERROR:", resistance.State)
 		}
 	}
 }

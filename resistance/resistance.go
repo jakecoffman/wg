@@ -624,7 +624,7 @@ func (g *Resist) handleMission(cmd *wg.Command) bool {
 	// update the suspicion level of the bots of the players that were on the mission
 	if thisMission.Success {
 		for _, i := range thisMission.Assignments {
-			g.Players[i].suspicion--
+			g.Players[i].suspicion -= 2
 		}
 		g.sendMsgAll("Mission successful! 🙌")
 	} else {

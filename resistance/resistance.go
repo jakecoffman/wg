@@ -223,6 +223,17 @@ func (g *Resist) botLeader() {
 			return g.Players[i].suspicion < g.Players[j].suspicion
 		})
 		thisMission.Assignments = ordered[:thisMission.Slots]
+		// make sure this player is in it
+		found := false
+		for _, id := range thisMission.Assignments {
+			if id == g.Leader {
+				found = true
+				break
+			}
+		}
+		if !found {
+			thisMission.Assignments[thisMission.Slots-1] = g.Leader
+		}
 	}
 	for _, i := range thisMission.Assignments {
 		g.Players[i].OnMission = true
@@ -624,7 +635,7 @@ func (g *Resist) handleMission(cmd *wg.Command) bool {
 	// update the suspicion level of the bots of the players that were on the mission
 	if thisMission.Success {
 		for _, i := range thisMission.Assignments {
-			g.Players[i].suspicion -= 2
+			g.Players[i].suspicion -= 3
 		}
 		g.sendMsgAll("Mission successful! 🙌")
 	} else {

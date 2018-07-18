@@ -31,8 +31,8 @@ func TestResistance(t *testing.T) {
 	false := []byte("false")
 	true := []byte("true")
 
-	var wins int
-	for wins < 1000 {
+	var spies, resist int
+	for spies + resist < 1000 {
 	drain:
 		for {
 			select {
@@ -63,10 +63,12 @@ func TestResistance(t *testing.T) {
 				game.Cmd <- &wg.Command{player1, p1Conn, cmdVoteMission, game.Version, true}
 			}
 		case stateSpywin:
-			fallthrough
+			spies++
+			fmt.Println(spies + resist)
+			game.Cmd <- &wg.Command{player1, p1Conn, cmdReady, game.Version, nil}
 		case stateResistanceWin:
-			wins++
-			fmt.Println(wins)
+			resist++
+			fmt.Println(spies + resist)
 			game.Cmd <- &wg.Command{player1, p1Conn, cmdReady, game.Version, nil}
 		case stateLobby:
 			game.Cmd <- &wg.Command{player1, p1Conn, cmdStart, game.Version, nil}
@@ -74,4 +76,6 @@ func TestResistance(t *testing.T) {
 			log.Fatal("ERROR:", resistance.State)
 		}
 	}
+
+	fmt.Println("Spies", spies, "Resist", resist)
 }

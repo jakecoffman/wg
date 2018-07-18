@@ -207,10 +207,10 @@ func (g *Resist) botLeader() {
 			}
 		}
 		sort.Slice(spies, func(i, j int) bool {
-			return g.Players[i].suspicion < g.Players[j].suspicion
+			return g.Players[spies[i]].suspicion < g.Players[spies[j]].suspicion
 		})
 		sort.Slice(resistance, func(i, j int) bool {
-			return g.Players[i].suspicion < g.Players[j].suspicion
+			return g.Players[resistance[i]].suspicion < g.Players[resistance[j]].suspicion
 		})
 		thisMission.Assignments = append(thisMission.Assignments, spies[0])
 		for i := 0; i < thisMission.Slots-1; i++ {
@@ -220,7 +220,7 @@ func (g *Resist) botLeader() {
 		// bot isn't spy, assign from the lowest suspicion first
 		ordered := rand.Perm(len(g.Players))
 		sort.Slice(ordered, func(i, j int) bool {
-			return g.Players[i].suspicion < g.Players[j].suspicion
+			return g.Players[ordered[i]].suspicion < g.Players[ordered[j]].suspicion
 		})
 		thisMission.Assignments = ordered[:thisMission.Slots]
 		// make sure this player is in it

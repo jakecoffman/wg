@@ -32,6 +32,10 @@ func (c *fakeConn) Ip() string {
 	return ""
 }
 
+func (c *fakeConn) Cookie(name string) (*http.Cookie, error) {
+	return c.req.Cookie(name)
+}
+
 func TestWsHandler(t *testing.T) {
 	r := httptest.NewRequest("GET", "/", nil)
 	r.AddCookie(&http.Cookie{Name: COOKIE_NAME, Value: "BOOP"})

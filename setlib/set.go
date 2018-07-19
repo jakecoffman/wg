@@ -203,8 +203,20 @@ func (g *Set) noSets(cmd *wg.Command) {
 	sets := g.FindSets()
 	if len(sets) > 0 {
 		g.players[playerId].Score -= len(sets)
+		g.sendAll(&PlayMsg{
+			Type:   "play",
+			Player: g.players[cmd.PlayerId].Id,
+			Words:  "missed some",
+			Score:  -len(sets),
+		})
 	} else {
 		g.players[playerId].Score += 1
+		g.sendAll(&PlayMsg{
+			Type:   "play",
+			Player: g.players[cmd.PlayerId].Id,
+			Words: "no sets",
+			Score:  1,
+		})
 	}
 
 	if g.cursor == len(g.rands) {
@@ -249,11 +261,25 @@ func (g *Set) play(cmd *wg.Command) {
 		log.Println("Not a set...")
 		g.players[cmd.PlayerId].Score -= 1
 		g.sendMetaToEveryone()
+		g.sendAll(&PlayMsg{
+			Type:   "play",
+			Player: g.players[cmd.PlayerId].Id,
+			Cards:  []Card{g.board[play[0]], g.board[play[1]], g.board[play[2]]},
+			Words: "not a set",
+			Score:  -1,
+		})
 		return
 	}
 	// it's a set
 	g.players[cmd.PlayerId].Score += 1
 	g.Version += 1
+
+	g.sendAll(&PlayMsg{
+		Type:   "play",
+		Player: g.players[cmd.PlayerId].Id,
+		Cards:  []Card{g.board[play[0]], g.board[play[1]], g.board[play[2]]},
+		Score:  1,
+	})
 
 	// just remove, don't deal
 	if g.cursor == len(g.rands) || len(g.board) > 12 {
@@ -355,4 +381,12 @@ type MetaMsg struct {
 	Players []*Player
 	Version int
 	You     int
+}
+
+type PlayMsg struct {
+	Type   string
+	Player int
+	Cards  []Card
+	Score  int
+	Words  string
 }

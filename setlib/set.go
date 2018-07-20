@@ -20,10 +20,6 @@ type Set struct {
 
 	players      map[string]*Player
 	playerCursor int
-
-	Version int
-	Created time.Time
-	Updated time.Time
 }
 
 type Player struct {
@@ -39,7 +35,6 @@ func NewGame(id string) *wg.Game {
 		players:      map[string]*Player{},
 		playerCursor: 1,
 		board:        []Card{},
-		Created:      time.Now(),
 	}
 	g.Game = wg.NewGame(g, id)
 	go g.run()

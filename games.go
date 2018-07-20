@@ -7,13 +7,13 @@ import (
 
 var AllGames = NewGames()
 
-const gameCleanup = 24 * time.Hour
+const gameCleanup = 48 * time.Hour
 
 func init() {
 	// check if games are abandoned, and if so remove them
 	go func() {
 		for {
-			time.Sleep(1 * time.Minute)
+			time.Sleep(1 * time.Hour)
 			for _, id := range AllGames.Ids() {
 				game := AllGames.Get(id)
 				if time.Now().Sub(game.Created) > gameCleanup && time.Now().Sub(game.Updated) > gameCleanup {
@@ -41,6 +41,7 @@ func NewGame(class interface{}, id string) *Game {
 		Class:   class,
 		Id:      id,
 		Created: time.Now(),
+		Updated: time.Now(),
 	}
 }
 

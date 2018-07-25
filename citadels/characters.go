@@ -18,7 +18,7 @@ func Magician(c *Citadels, player *Player, choice int) bool {
 }
 
 func King(c *Citadels, player *Player, choice int) bool {
-	c.Crown = player.Id
+	c.Crown.Value = player.Id
 	return true
 }
 

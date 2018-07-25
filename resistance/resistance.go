@@ -157,6 +157,10 @@ func (g *Resist) run() {
 		}
 		cmd = <-g.Cmd
 
+		if g.Version != cmd.Version {
+			continue
+		}
+
 		switch cmd.Type {
 		case cmdJoin:
 			update = g.handleJoin(cmd)
@@ -365,11 +369,6 @@ func (g *Resist) handleReady(cmd *wg.Command) bool {
 }
 
 func (g *Resist) handleStart(cmd *wg.Command) bool {
-	if g.Version != cmd.Version {
-		sendMsg(cmd.Ws, "Someone else started the game first")
-		return false
-	}
-
 	if g.State != stateLobby {
 		sendMsg(cmd.Ws, "Illegal state")
 		return false
@@ -658,7 +657,7 @@ func (g *Resist) handleName(cmd *wg.Command) bool {
 	err := json.Unmarshal(cmd.Data, &name)
 	if err != nil {
 		log.Println(err)
-		sendMsg(p.ws, "Got invalid data for team assignment")
+		sendMsg(p.ws, "Got invalid data for name")
 		return false
 	}
 

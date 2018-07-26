@@ -17,7 +17,7 @@ func init() {
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	http.Handle("/ws", websocket.Handler(wg.WsHandler(wg.ProcessPlayerCommands(citadels.NewGame))))
-	port := "8112"
+	port := "8113"
 	log.Println("Serving http://localhost:" + port)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, nil))
 }

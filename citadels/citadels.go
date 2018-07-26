@@ -7,8 +7,7 @@ import (
 	"runtime/debug"
 	"math/rand"
 	"encoding/json"
-	"sort"
-)
+	)
 
 type Citadels struct {
 	*wg.Game
@@ -18,7 +17,8 @@ type Citadels struct {
 
 	Turn          int // used to tell whose turn it is to pick roles or whose turn is next
 	State         State
-	characterDeck []int
+	characters    []*Character
+	characterDeck []*Character
 	districtDeck  []*District
 	crown         Circular
 	roles         [8]*int // stores who chose what, nil represents no one chose it
@@ -76,7 +76,7 @@ func NewGame(id string) *wg.Game {
 }
 
 func (c *Citadels) reset() {
-	c.characterDeck = make([]int, 0, len(Characters))
+	c.characterDeck = make([]*Character, 0, 8)
 	c.districtDeck = make([]*District, 0, len(Districts))
 	c.roles = [8]*int{}
 	c.crown = Circular{Value: 0, Max: len(c.Players)}
@@ -272,15 +272,20 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 		c.Players[0].HasCrown = true
 	}
 
-	// shuffle the decks
-	c.characterDeck = rand.Perm(len(Characters))
+	// TODO: add the expansion characters and allow users to choose
+	c.characters = []*Character{Assassin, Thief, Magician, King, Bishop, Merchant, Architect, Warlord}
+	for _, char := range c.characters {
+		c.characterDeck = append(c.characterDeck, char)
+	}
+	// shuffle the deck
 	for _, i := range rand.Perm(len(Districts)) {
 		c.districtDeck = append(c.districtDeck, Districts[i])
 	}
 
 	// 2 player variant only: discard 1 without anyone seeing
 	// TODO other player variants
-	c.characterDeck = c.characterDeck[1:]
+	n := rand.Intn(8)
+	c.characterDeck = append(c.characterDeck[:n], c.characterDeck[n+1:]...)
 
 	// deal 4 districts to each player, and give starting gold
 	for _, p := range c.Players {
@@ -323,13 +328,14 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 		return false
 	}
 
+	log.Println(cmd.Data)
 	var choice int
 	if err := json.Unmarshal(cmd.Data, choice); err != nil {
 		sendMsg(p.ws, "Couldn't decode choice")
 		return false
 	}
 
-	if choice > len(c.characterDeck) || choice < 0 {
+	if choice > len(c.characterDeck) || choice < 0 || c.roles[choice] != nil {
 		sendMsg(p.ws, "Invalid choice")
 		return false
 	}
@@ -338,7 +344,7 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 	switch len(c.characterDeck) {
 	case 7:
 		// player 1 chose their first character, turn over
-		c.roles[c.characterDeck[choice]] = &p.Id
+		c.roles[choice] = &p.Id
 		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
 		c.Turn++
 		if c.Turn > len(c.Players) {
@@ -346,7 +352,7 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 		}
 	case 6:
 		// player 2 chose their first character and gets to go again
-		c.roles[c.characterDeck[choice]] = &p.Id
+		c.roles[choice] = &p.Id
 		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
 	case 5:
 		// player 2 is discarding this character
@@ -357,7 +363,7 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 		}
 	case 4:
 		// player 1 chose their second character and gets to go again
-		c.roles[c.characterDeck[choice]] = &p.Id
+		c.roles[choice] = &p.Id
 		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
 	case 3:
 		// player 1 is discarding this character
@@ -368,8 +374,8 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 		}
 	case 2:
 		// player 2 chose their second character and this phase is over
-		c.roles[c.characterDeck[choice]] = &p.Id
-		c.characterDeck = []int{}
+		c.roles[choice] = &p.Id
+		c.characterDeck = []*Character{}
 		c.State = goldOrDraw
 
 		// figure out whose turn it is
@@ -478,7 +484,7 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 	}
 
 	// next player's turn?
-	for i := c.Turn + 1; i < len(Characters); i++ {
+	for i := c.Turn + 1; i < 8; i++ {
 		if c.roles[i] != nil && c.Kill != i {
 			c.Turn = i
 			return true
@@ -528,7 +534,7 @@ func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 		return false
 	}
 
-	return Characters[c.Turn](c, p, cmd.Data)
+	return c.characters[c.Turn].Play(c, p, cmd.Data)
 }
 
 type UpdateMsg struct {
@@ -540,7 +546,7 @@ type UpdateMsg struct {
 type secret struct {
 	Id       int
 	HasCrown bool
-	Roles    []int `json:",omitempty"`
+	Roles    []*Character `json:",omitempty"`
 	Hand     []*District
 }
 
@@ -550,11 +556,7 @@ func (c *Citadels) sendEveryoneEverything() {
 			msg := &UpdateMsg{Type: "all", Update: c}
 			msg.You = &secret{Id: p.Id, HasCrown: p.HasCrown, Hand: p.hand}
 			if c.State == roles && c.Turn == i {
-				msg.You.Roles = make([]int, len(c.characterDeck))
-				copy(msg.You.Roles, c.characterDeck)
-				sort.Slice(msg.You.Roles, func(i, j int) bool {
-					return msg.You.Roles[i] < msg.You.Roles[j]
-				})
+				msg.You.Roles = c.characterDeck
 			}
 			p.ws.Send(msg)
 		}

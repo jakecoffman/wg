@@ -15,16 +15,27 @@ type Citadels struct {
 	Players      []*Player
 	playerCursor int
 
-	Turn          int // used to tell whose turn it is to pick roles or whose turn is next
+	Turn          Circular // used to tell whose turn it is to pick roles or whose turn is next
 	State         State
-	characters    []*Character
-	characterDeck []*Character
+	characters    []ChoosableCharacter // the characters in this game (since characters can be substituted)
 	districtDeck  []*District
 	crown         Circular
 	roles         [8]*int // stores who chose what, nil represents no one chose it
 	FirstToEight  int `json:",omitempty"`
 
 	Kill int // assassin chose to kill this player
+}
+
+type ChoosableCharacter struct {
+	*Character
+	Chosen bool // lets the frontend know that character has been chosen
+}
+
+func (c ChoosableCharacter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"Name": c.Character.Name,
+		"Chosen": c.Chosen,
+	})
 }
 
 type Circular struct {
@@ -41,7 +52,7 @@ func (c *Circular) MarshalJSON() ([]byte, error) {
 func (c *Circular) Inc() int {
 	rv := c.Value
 	c.Value++
-	if c.Value > c.Max {
+	if c.Value >= c.Max {
 		c.Value = 0
 	}
 	return rv
@@ -76,7 +87,6 @@ func NewGame(id string) *wg.Game {
 }
 
 func (c *Citadels) reset() {
-	c.characterDeck = make([]*Character, 0, 8)
 	c.districtDeck = make([]*District, 0, len(Districts))
 	c.roles = [8]*int{}
 	c.crown = Circular{Value: 0, Max: len(c.Players)}
@@ -247,17 +257,17 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 		return false
 	}
 
-	//if len(c.Players) < 2 || len(c.Players) > 7 {
-	//	sendMsg(cmd.Ws, "Need 2-7 players to start the game")
-	//	return false
-	//}
+	if len(c.Players) < 2 || len(c.Players) > 7 {
+		sendMsg(cmd.Ws, "Need 2-7 players to start the game")
+		return false
+	}
 
 	// TODO handle game variants, for now this is just the 2 player game
 
 	c.State = roles
 	c.Kill = -1
 
-	// remove unconnected players and reorder them, leader always starts in position 1
+	// remove unconnected players and shuffle them, leader always starts in position 1
 	{
 		var newPlayers []*Player
 		walk := rand.Perm(len(c.Players))
@@ -270,12 +280,20 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 		c.Players = newPlayers
 		c.crown = Circular{Value: 0, Max: len(c.Players)}
 		c.Players[0].HasCrown = true
+		c.Turn.Value = 0
+		c.Turn.Max = len(c.Players)
 	}
 
 	// TODO: add the expansion characters and allow users to choose
-	c.characters = []*Character{Assassin, Thief, Magician, King, Bishop, Merchant, Architect, Warlord}
-	for _, char := range c.characters {
-		c.characterDeck = append(c.characterDeck, char)
+	c.characters = []ChoosableCharacter{
+		{Character: Assassin},
+		{Character: Thief},
+		{Character: Magician},
+		{Character: King},
+		{Character: Bishop},
+		{Character: Merchant},
+		{Character: Architect},
+		{Character: Warlord},
 	}
 	// shuffle the deck
 	for _, i := range rand.Perm(len(Districts)) {
@@ -284,8 +302,7 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 
 	// 2 player variant only: discard 1 without anyone seeing
 	// TODO other player variants
-	n := rand.Intn(8)
-	c.characterDeck = append(c.characterDeck[:n], c.characterDeck[n+1:]...)
+	c.characters[rand.Intn(8)].Chosen = true
 
 	// deal 4 districts to each player, and give starting gold
 	for _, p := range c.Players {
@@ -324,68 +341,72 @@ func (c *Citadels) handleName(cmd *wg.Command) bool {
 
 func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 	p, i := Find(c.Players, cmd.PlayerId)
-	if c.Turn != i || c.State != roles {
+	if c.Turn.Value != i || c.State != roles {
 		return false
 	}
 
-	log.Println(cmd.Data)
 	var choice int
-	if err := json.Unmarshal(cmd.Data, choice); err != nil {
+	if err := json.Unmarshal(cmd.Data, &choice); err != nil {
+		log.Println(err)
 		sendMsg(p.ws, "Couldn't decode choice")
 		return false
 	}
 
-	if choice > len(c.characterDeck) || choice < 0 || c.roles[choice] != nil {
+	if choice > 8 || choice < 0 {
 		sendMsg(p.ws, "Invalid choice")
 		return false
 	}
 
+	if c.characters[choice].Chosen {
+		sendMsg(p.ws, "Character already chosen")
+		return false
+	}
+
+	choosed := 0
+	for _, char := range c.characters {
+		if char.Chosen {
+			choosed++
+		}
+	}
+
 	// two player variant
-	switch len(c.characterDeck) {
-	case 7:
+	switch choosed {
+	case 1:
 		// player 1 chose their first character, turn over
 		c.roles[choice] = &p.Id
-		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
-		c.Turn++
-		if c.Turn > len(c.Players) {
-			c.Turn = 0
-		}
-	case 6:
+		c.characters[choice].Chosen = true
+		c.Turn.Inc()
+	case 2:
 		// player 2 chose their first character and gets to go again
 		c.roles[choice] = &p.Id
-		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
-	case 5:
+		c.characters[choice].Chosen = true
+	case 3:
 		// player 2 is discarding this character
-		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
-		c.Turn++
-		if c.Turn > len(c.Players) {
-			c.Turn = 0
-		}
+		c.characters[choice].Chosen = true
+		c.Turn.Inc()
 	case 4:
 		// player 1 chose their second character and gets to go again
 		c.roles[choice] = &p.Id
-		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
-	case 3:
+		c.characters[choice].Chosen = true
+	case 5:
 		// player 1 is discarding this character
-		c.characterDeck = append(c.characterDeck[:choice], c.characterDeck[choice+1:]...)
-		c.Turn++
-		if c.Turn > len(c.Players) {
-			c.Turn = 0
-		}
-	case 2:
+		c.characters[choice].Chosen = true
+		c.Turn.Inc()
+	case 6:
 		// player 2 chose their second character and this phase is over
 		c.roles[choice] = &p.Id
-		c.characterDeck = []*Character{}
+		c.characters[choice].Chosen = true
 		c.State = goldOrDraw
 
 		// figure out whose turn it is
 		for i, id := range c.roles {
 			if id != nil {
-				c.Turn = i // subtle: store the index instead of the ID so we can pick up here later
+				c.Turn.Value = i // subtle: store the index instead of the ID so we can pick up here later
+				c.Turn.Max = 8
 			}
 		}
 	default:
-		log.Println("Unexpected state:", len(c.characterDeck), choice, p, c)
+		log.Println("Unexpected state:", choosed, choice, p, c)
 		return false
 	}
 
@@ -394,7 +415,7 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 
 func (c *Citadels) handleAction(cmd *wg.Command) bool {
 	p, id := Find(c.Players, cmd.PlayerId)
-	if id != *c.roles[c.Turn] {
+	if id != *c.roles[c.Turn.Value] {
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
@@ -412,11 +433,11 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 			return false
 		}
 		// merchant draws an additional gold
-		if c.Turn == 5 {
+		if c.Turn.Value == 5 {
 			p.Gold++
 		}
 		// architect draws two additional district cards
-		if c.Turn == 6 {
+		if c.Turn.Value == 6 {
 			p.hand = append(p.hand, c.districtDeck[:2]...)
 			c.districtDeck = c.districtDeck[2:]
 		}
@@ -449,7 +470,7 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 
 func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 	p, id := Find(c.Players, cmd.PlayerId)
-	if id != *c.roles[c.Turn] {
+	if id != *c.roles[c.Turn.Value] {
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
@@ -484,9 +505,9 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 	}
 
 	// next player's turn?
-	for i := c.Turn + 1; i < 8; i++ {
+	for i := c.Turn.Value + 1; i < 8; i++ {
 		if c.roles[i] != nil && c.Kill != i {
-			c.Turn = i
+			c.Turn.Value = i
 			return true
 		}
 	}
@@ -520,7 +541,7 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 
 	if c.State != end {
 		c.State = roles
-		c.Turn = c.crown.Inc()
+		c.Turn.Value = c.crown.Inc()
 		c.Kill = -1
 	}
 
@@ -529,12 +550,12 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 
 func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 	p, id := Find(c.Players, cmd.PlayerId)
-	if id != *c.roles[c.Turn] {
+	if id != *c.roles[c.Turn.Value] {
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
 
-	return c.characters[c.Turn].Play(c, p, cmd.Data)
+	return c.characters[c.Turn.Value].Play(c, p, cmd.Data)
 }
 
 type UpdateMsg struct {
@@ -545,8 +566,8 @@ type UpdateMsg struct {
 
 type secret struct {
 	Id       int
-	HasCrown bool
-	Roles    []*Character `json:",omitempty"`
+	HasCrown bool `json:",omitempty"`
+	Roles    []ChoosableCharacter `json:",omitempty"`
 	Hand     []*District
 }
 
@@ -555,8 +576,8 @@ func (c *Citadels) sendEveryoneEverything() {
 		if p.ws != nil {
 			msg := &UpdateMsg{Type: "all", Update: c}
 			msg.You = &secret{Id: p.Id, HasCrown: p.HasCrown, Hand: p.hand}
-			if c.State == roles && c.Turn == i {
-				msg.You.Roles = c.characterDeck
+			if c.State == roles && c.Turn.Value == i {
+				msg.You.Roles = c.characters
 			}
 			p.ws.Send(msg)
 		}

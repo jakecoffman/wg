@@ -7,10 +7,6 @@ type Character struct {
 	Play func(c *Citadels, player *Player, data json.RawMessage) bool
 }
 
-func (c Character) MarshalJSON() ([]byte, error) {
-	return json.Marshal(c.Name)
-}
-
 var Assassin = &Character{
 	"Assassin",
 	func(c *Citadels, player *Player, data json.RawMessage) bool {

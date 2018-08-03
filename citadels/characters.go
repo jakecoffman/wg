@@ -4,11 +4,13 @@ import "encoding/json"
 
 type Character struct {
 	Name string
-	Play func(c *Citadels, player *Player, data json.RawMessage) bool
+	CanTax Color
+	special func(c *Citadels, player *Player, data json.RawMessage) bool
 }
 
 var Assassin = &Character{
 	"Assassin",
+	None,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
 		var choice int
 		if err := json.Unmarshal(data, &choice); err != nil {
@@ -26,6 +28,7 @@ var Assassin = &Character{
 
 var Thief = &Character{
 	"Thief",
+	None,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
 		var choice int
 		if err := json.Unmarshal(data, &choice); err != nil {
@@ -42,6 +45,7 @@ var Thief = &Character{
 
 var Magician = &Character{
 	"Magician",
+	None,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
 		var choice struct {
 			Swap   *int
@@ -83,53 +87,48 @@ var Magician = &Character{
 
 var King = &Character{
 	"King",
+	Yellow,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
-		_, c.crown.Value = Find(c.Players, player.Uuid)
-		for _, card := range player.hand {
-			if card.Color == Yellow {
-				player.Gold++
-			}
-		}
-		return true
+		// King automatically receives crown
+		return false
 	},
 }
 
 var Bishop = &Character{
 	"Bishop",
+	Blue,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
-		for _, card := range player.hand {
-			if card.Color == Blue {
-				player.Gold++
-			}
-		}
-		return true
+		// Bishop is immune to warlord
+		return false
 	},
 }
 
 var Merchant = &Character{
 	"Merchant",
+	Green,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
 		// merchant's additional gold is added in the action phase
-		for _, card := range player.hand {
-			if card.Color == Green {
-				player.Gold++
-			}
-		}
-		return true
+		return false
 	},
 }
 
 var Architect = &Character{
 	"Architect",
+	None,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
-		// architect gets additional district cards in the action phase
-		// and can build up to three districts
+		if c.State != build {
+			sendMsg(player.ws, "Must use power after action phase")
+			return false
+		}
+		player.hand = append(player.hand, c.districtDeck[:2]...)
+		c.districtDeck = c.districtDeck[2:]
 		return true
 	},
 }
 
 var Warlord = &Character{
 	"Warlord",
+	Red,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
 		var choice struct {
 			Swap   *int
@@ -139,12 +138,7 @@ var Warlord = &Character{
 			sendMsg(player.ws, "Couldn't unmarshal choice")
 			return false
 		}
-
-		for _, card := range player.hand {
-			if card.Color == Red {
-				player.Gold++
-			}
-		}
+		// TODO destroy
 		return true
 	},
 }

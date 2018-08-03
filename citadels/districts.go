@@ -8,6 +8,7 @@ const (
 	Red                 // Military
 	Yellow              // Noble
 	Purple              // Special
+	None                // Colorless, cannot tax
 )
 
 type District struct {

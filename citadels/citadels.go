@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"math/rand"
 	"encoding/json"
+	"sort"
 )
 
 type Citadels struct {
@@ -64,7 +65,6 @@ type Player struct {
 	Gold      int
 	hand      []*District
 	Districts []*District
-	built     int
 
 	score int
 }
@@ -219,6 +219,11 @@ func (c *Citadels) handleJoin(cmd *wg.Command) bool {
 	player.ws = cmd.Ws
 	player.Connected = true
 	player.Ip = player.ws.Ip()
+
+	if c.State != lobby {
+		c.sendGameInfo(cmd.Ws)
+	}
+
 	return true
 }
 
@@ -309,6 +314,13 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 		c.districtDeck = c.districtDeck[4:]
 		p.Gold = 2
 		p.Districts = []*District{}
+	}
+
+	// tell all players the characters in this game
+	for _, p := range c.Players {
+		if p.ws != nil {
+			c.sendGameInfo(p.ws)
+		}
 	}
 
 	return true
@@ -442,14 +454,13 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 			p.Gold++
 		}
 		// architect draws two additional district cards
-		//if c.Turn.Value == 6 {
-		//	p.hand = append(p.hand, c.districtDeck[:2]...)
-		//	c.districtDeck = c.districtDeck[2:]
-		//}
+		if c.Turn.Value == 6 && c.characters[6].Character == Architect {
+			p.hand = append(p.hand, c.districtDeck[:2]...)
+			c.districtDeck = c.districtDeck[2:]
+		}
 		if choice == 0 {
 			p.Gold += 2
 			c.State = build
-			p.built = 0
 			return true
 		}
 		// give two cards, they will return one next
@@ -458,12 +469,19 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 		return true
 	}
 
-	var choice int
-	if err := json.Unmarshal(cmd.Data, &choice); err != nil {
+	var choices []int
+	if err := json.Unmarshal(cmd.Data, &choices); err != nil {
 		log.Println(err)
 		sendMsg(p.ws, "couldn't unmarshal choice")
 		return false
 	}
+
+	if len(choices) != 1 {
+		sendMsg(p.ws, "select one card to put back")
+		return false
+	}
+
+	choice := choices[0]
 
 	if choice < len(p.hand)-2 || choice > len(p.hand)-1 {
 		sendMsg(p.ws, "discard one of the cards you drew (last 2)")
@@ -477,7 +495,6 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 	// drop the last card off their deck
 	p.hand = p.hand[:len(p.hand)-1]
 	c.State = build
-	p.built = 0
 	return true
 }
 
@@ -492,39 +509,60 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 		return false
 	}
 
-	var choice int
-	if err := json.Unmarshal(cmd.Data, &choice); err != nil {
+	var choices []int
+	if err := json.Unmarshal(cmd.Data, &choices); err != nil {
 		sendMsg(p.ws, "Couldn't unmarshal choice")
 		return false
 	}
 
-	if choice == -1 {
+	if len(choices) == 0 {
 		c.State = endTurn
 		return true
 	}
 
-	chosenDistrict := p.hand[choice]
-	if p.Gold < chosenDistrict.Value {
-		sendMsg(p.ws, "You can't afford that district")
+	if c.Turn.Value == 6 && c.characters[6].Character == Architect && len(choices) > 3 {
+		sendMsg(p.ws, "Architect can only build up to three times per round")
 		return false
-	}
-	for _, district := range p.Districts {
-		if district.Name == chosenDistrict.Name {
-			sendMsg(p.ws, "Can't have duplicate districts")
+	} else {
+		if len(choices) > 1 {
+			sendMsg(p.ws, "Only architect can build more than once per round")
 			return false
 		}
 	}
-	p.Gold -= chosenDistrict.Value
-	p.Districts = append(p.Districts, p.hand[choice])
-	p.hand[choice] = p.hand[len(p.hand)-1]
-	p.hand = p.hand[:len(p.hand)-1]
-	p.built++
-	if c.Turn.Value == 6 && c.characters[6].Character == Architect {
-		// Architect can build 3 times during their turn
-		if p.built < 3 {
-			return true
+
+	// highest to lowest so we can remove from hand as we go later
+	sort.Slice(choices, func(i, j int) bool {
+		return choices[i] > choices[j]
+	})
+
+	var sum int
+	for _, choice := range choices {
+		chosenDistrict := p.hand[choice]
+		if p.Gold < chosenDistrict.Value {
+			sendMsg(p.ws, "You can't afford a district")
+			return false
 		}
+		for _, district := range p.Districts {
+			if district.Name == chosenDistrict.Name {
+				sendMsg(p.ws, "Can't have duplicate districts")
+				return false
+			}
+		}
+		sum += chosenDistrict.Value
 	}
+
+	if sum > p.Gold {
+		sendMsg(p.ws, "You can't afford all of these")
+		return false
+	}
+
+	for _, choice := range choices {
+		chosenDistrict := p.hand[choice]
+		p.Gold -= chosenDistrict.Value
+		p.Districts = append(p.Districts, p.hand[choice])
+		p.hand = append(p.hand[:choice], p.hand[choice+1:]...)
+	}
+
 	c.State = endTurn
 	return true
 }
@@ -601,7 +639,50 @@ func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 		return false
 	}
 
-	return c.characters[c.Turn.Value].special(c, p, cmd.Data)
+	var choice int
+	if err := json.Unmarshal(cmd.Data, &choice); err != nil {
+		log.Println(err)
+		sendMsg(p.ws, "Couldn't decode choice")
+		return false
+	}
+
+	character := c.characters[c.Turn.Value]
+
+	if choice == 0 {
+		return character.special(c, p, cmd.Data)
+	}
+
+	if character.CanTax != None {
+		for _, district := range p.hand {
+			if district.Color == character.CanTax {
+				p.Gold++
+			}
+		}
+		return true
+	}
+
+	return false
+}
+
+// This info is sent once at the beginning of each game (and when users reconnect)
+type GameMsg struct {
+	Type string
+	Characters []*Character
+}
+
+func (c *Citadels) sendGameInfo(ws wg.Connector) {
+	var characters []*Character
+
+	for _, char := range c.characters {
+		characters = append(characters, char.Character)
+	}
+
+	msg := &GameMsg{
+		Type: "info",
+		Characters: characters,
+	}
+
+	ws.Send(msg)
 }
 
 type UpdateMsg struct {

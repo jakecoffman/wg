@@ -16,12 +16,14 @@ type Citadels struct {
 	Players      []*Player
 	playerCursor int
 
-	Turn         Circular // used to tell whose turn it is to pick roles or whose turn is next
-	State        State
-	characters   []*ChoosableCharacter // the characters in this game (since characters can be substituted)
-	districtDeck []*District
-	crown        Circular
-	FirstToEight int `json:",omitempty"`
+	Turn          Circular // used to tell whose turn it is
+	CharCur       int
+	State         State
+	characters    []*ChoosableCharacter // the characters in this game (since characters can be substituted)
+	districtDeck  []*District
+	crown         Circular // tracks who practically has the crown (doesn't move until next turn)
+	lastRoundKing bool
+	FirstToEight  int `json:",omitempty"`
 
 	Kill int // assassin chose to kill this player
 }
@@ -92,6 +94,27 @@ func (c *Citadels) reset() {
 
 type State int
 
+func (s State) String() string {
+	switch int(s) {
+	case 0:
+		return "Lobby"
+	case 1:
+		return "Choose"
+	case 2:
+		return "GoldOrDraw"
+	case 3:
+		return "PutCardBack"
+	case 4:
+		return "Build"
+	case 5:
+		return "EndTurn"
+	case 6:
+		return "GameOver"
+	default:
+		panic(s)
+	}
+}
+
 const (
 	lobby = State(iota)
 	choose
@@ -111,6 +134,7 @@ const (
 	cmdDisconnect = "disconnect"
 	cmdStop       = "stop"
 	cmdName       = "name"
+	cmdReady      = "ready"
 
 	// anyone can do these things
 	cmdAddBot    = "addbot"
@@ -224,6 +248,7 @@ func (c *Citadels) handleJoin(cmd *wg.Command) bool {
 		c.sendGameInfo(cmd.Ws)
 	}
 
+	log.Println("Player", player.Id, "joined")
 	return true
 }
 
@@ -231,6 +256,7 @@ func (c *Citadels) handleLeave(cmd *wg.Command) bool {
 	for i, player := range c.Players {
 		if player.Uuid == cmd.PlayerId {
 			c.Players = append(c.Players[0:i], c.Players[i+1:]...)
+			log.Println("Player", i, "left")
 			return true
 		}
 	}
@@ -268,6 +294,7 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 
 	c.State = choose
 	c.Kill = -1
+	c.lastRoundKing = false
 
 	// remove unconnected players and shuffle them, leader always starts in position 1
 	{
@@ -323,6 +350,8 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 		}
 	}
 
+	log.Println("Game started")
+
 	return true
 }
 
@@ -352,7 +381,13 @@ func (c *Citadels) handleName(cmd *wg.Command) bool {
 
 func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 	p, i := Find(c.Players, cmd.PlayerId)
-	if c.Turn.Value != i || c.State != choose {
+	if c.Turn.Value != i {
+		log.Println("Not your turn")
+		return false
+	}
+
+	if c.State != choose {
+		log.Println("Wrong state")
 		return false
 	}
 
@@ -364,11 +399,13 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 	}
 
 	if choice > 8 || choice < 0 {
+		log.Println("Invalid choice")
 		sendMsg(p.ws, "Invalid choice")
 		return false
 	}
 
 	if c.characters[choice].Chosen {
+		log.Println("Character already chosen")
 		sendMsg(p.ws, "Character already chosen")
 		return false
 	}
@@ -411,14 +448,16 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 			c.State = goldOrDraw
 
 			// figure out whose turn it is
+			c.CharCur = 0
 			for i, char := range c.characters {
 				if char.player != nil {
+					_, c.Turn.Value = Find(c.Players, char.player.Uuid)
 					if i == 4 && c.characters[4].Character == King {
-						c.crown.Value = i
+						c.crown.Value = c.Turn.Value
 					}
-					c.Turn.Value = i // subtle: turn now is the index of the character
-					c.Turn.Max = 8
-					break
+					c.CharCur = i
+					log.Println("Round starting")
+					return true
 				}
 			}
 		default:
@@ -427,12 +466,13 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 		}
 	}
 
+	log.Println("Player made a character choice")
 	return true
 }
 
 func (c *Citadels) handleAction(cmd *wg.Command) bool {
 	p, _ := Find(c.Players, cmd.PlayerId)
-	if p != c.characters[c.Turn.Value].player {
+	if p != c.Players[c.Turn.Value] {
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
@@ -461,11 +501,13 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 		if choice == 0 {
 			p.Gold += 2
 			c.State = build
+			log.Println("Player chose gold")
 			return true
 		}
 		// give two cards, they will return one next
 		c.State = putCardBack
 		p.hand = append(p.hand, c.districtDeck[:2]...)
+		log.Println("Player chose districts")
 		return true
 	}
 
@@ -495,12 +537,13 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 	// drop the last card off their deck
 	p.hand = p.hand[:len(p.hand)-1]
 	c.State = build
+	log.Println("Player returned a district")
 	return true
 }
 
 func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 	p, _ := Find(c.Players, cmd.PlayerId)
-	if p != c.characters[c.Turn.Value].player {
+	if p != c.Players[c.Turn.Value] {
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
@@ -558,6 +601,7 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 
 	for _, choice := range choices {
 		chosenDistrict := p.hand[choice]
+		log.Printf("Player built %v (%v %v)", chosenDistrict.Name, chosenDistrict.Value, chosenDistrict.Color)
 		p.Gold -= chosenDistrict.Value
 		p.Districts = append(p.Districts, p.hand[choice])
 		p.hand = append(p.hand[:choice], p.hand[choice+1:]...)
@@ -569,12 +613,12 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 
 func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 	// next player's turn?
-	for c.Turn.Inc(); c.Turn.Value != 0; c.Turn.Inc() {
-		if c.characters[c.Turn.Value].player != nil {
-			if c.Turn.Value == 4 && c.characters[4].Character == King {
+	for c.CharCur += 1; c.CharCur < 8; c.CharCur++ {
+		if c.characters[c.CharCur].player != nil {
+			if c.CharCur == 4 && c.characters[4].Character == King {
 				c.crown.Value = c.Turn.Value
 			}
-			if c.Kill == c.Turn.Value {
+			if c.Kill == c.CharCur {
 				continue
 			}
 			c.State = goldOrDraw
@@ -666,7 +710,7 @@ func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 
 // This info is sent once at the beginning of each game (and when users reconnect)
 type GameMsg struct {
-	Type string
+	Type       string
 	Characters []*Character
 }
 
@@ -678,7 +722,7 @@ func (c *Citadels) sendGameInfo(ws wg.Connector) {
 	}
 
 	msg := &GameMsg{
-		Type: "info",
+		Type:       "info",
 		Characters: characters,
 	}
 

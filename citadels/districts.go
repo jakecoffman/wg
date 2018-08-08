@@ -2,6 +2,23 @@ package citadels
 
 type Color int
 
+func (c Color) String() string {
+	switch int(c) {
+	case 0:
+		return "Green"
+	case 1:
+		return "Blue"
+	case 2:
+		return "Red"
+	case 3:
+		return "Yellow"
+	case 4:
+		return "Purple"
+	default:
+		return "None"
+	}
+}
+
 const (
 	Green = Color(iota) // Trade
 	Blue                // Religious

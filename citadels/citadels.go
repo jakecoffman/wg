@@ -170,37 +170,45 @@ func (c *Citadels) run() {
 			continue
 		}
 
-		switch cmd.Type {
-		case cmdJoin:
-			update = c.handleJoin(cmd)
-		case cmdLeave:
-			update = c.handleLeave(cmd)
-		case cmdDisconnect:
-			update = c.handleDisconnect(cmd)
-		case cmdStop:
+		if cmd.Type == cmdStop {
 			return
-		case cmdName:
-			update = c.handleName(cmd)
-		case cmdStart:
-			update = c.handleStart(cmd)
-		case cmdChoose:
-			update = c.handleChoose(cmd)
-		case cmdAction:
-			update = c.handleAction(cmd)
-		case cmdBuild:
-			update = c.handleBuild(cmd)
-		case cmdPowers:
-			update = c.handleSpecial(cmd)
-		case cmdEnd:
-			update = c.handleEndTurn(cmd)
-		default:
-			log.Println("Unknown message:", cmd.Type)
-			continue
+		} else {
+			update = c.handler(cmd)
 		}
+
 		if update {
 			c.sendEveryoneEverything()
 			c.Updated = time.Now()
 		}
+	}
+
+}
+
+func (c *Citadels) handler(cmd *wg.Command) bool {
+	switch cmd.Type {
+	case cmdJoin:
+		return c.handleJoin(cmd)
+	case cmdLeave:
+		return c.handleLeave(cmd)
+	case cmdDisconnect:
+		return c.handleDisconnect(cmd)
+	case cmdName:
+		return c.handleName(cmd)
+	case cmdStart:
+		return c.handleStart(cmd)
+	case cmdChoose:
+		return c.handleChoose(cmd)
+	case cmdAction:
+		return c.handleAction(cmd)
+	case cmdBuild:
+		return c.handleBuild(cmd)
+	case cmdPowers:
+		return c.handleSpecial(cmd)
+	case cmdEnd:
+		return c.handleEndTurn(cmd)
+	default:
+		log.Println("Unknown message:", cmd.Type)
+		return false
 	}
 }
 
@@ -454,7 +462,7 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 						c.crown.Value = c.Turn.Value
 					}
 					c.CharCur = i
-					log.Println("Round starting")
+					log.Println("Round starting: Player", c.Turn.Value)
 					return true
 				}
 			}
@@ -488,11 +496,11 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 			return false
 		}
 		// merchant draws an additional gold
-		if c.Turn.Value == 5 {
+		if c.CharCur == 5 {
 			p.Gold++
 		}
 		// architect draws two additional district cards
-		if c.Turn.Value == 6 && c.characters[6].Character == Architect {
+		if c.CharCur == 6 && c.characters[6].Character == Architect {
 			p.hand = append(p.hand, c.districtDeck[:2]...)
 			c.districtDeck = c.districtDeck[2:]
 		}
@@ -617,6 +625,7 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 	}
 
 	if len(p.Districts) >= 8 && c.FirstToEight == -1 {
+		log.Println("Player", c.Turn.Value, "is first to 8 districts")
 		c.FirstToEight = c.Turn.Value
 	}
 
@@ -636,6 +645,7 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 	// next player's turn?
 	for c.CharCur += 1; c.CharCur < 8; c.CharCur++ {
 		if c.characters[c.CharCur].player != nil {
+			_, c.Turn.Value = Find(c.Players, c.characters[c.CharCur].player.Uuid)
 			if c.CharCur == 4 && c.characters[4].Character == King {
 				c.crown.Value = c.Turn.Value
 			}
@@ -699,7 +709,7 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 
 func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 	p, _ := Find(c.Players, cmd.PlayerId)
-	if p != c.characters[c.Turn.Value].player {
+	if p != c.Players[c.Turn.Value] {
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
@@ -711,7 +721,7 @@ func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 		return false
 	}
 
-	character := c.characters[c.Turn.Value]
+	character := c.characters[c.CharCur]
 
 	if choice == 0 {
 		return character.special(c, p, cmd.Data)
@@ -774,17 +784,13 @@ func (c *Citadels) sendEveryoneEverything() {
 				HasCrown: p.HasCrown,
 				Hand:     p.hand,
 			}
-			if c.State == choose {
-				// tell the player their turn to choose a character
-				if c.Turn.Value == i {
-					msg.You.Turn = true
-				}
-			} else if c.State != lobby && c.characters[c.Turn.Value].player == p {
+			if c.Turn.Value == i {
 				msg.You.Turn = true
-				msg.You.Character = c.characters[c.Turn.Value]
-			}
-			if c.State == choose && c.Turn.Value == i {
-				msg.You.Roles = c.characters
+				if c.State > choose && c.State < gameOver {
+					msg.You.Character = c.characters[c.CharCur]
+				} else if c.State == choose {
+					msg.You.Roles = c.characters
+				}
 			}
 			p.ws.Send(msg)
 		}

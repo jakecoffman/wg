@@ -10,7 +10,7 @@ import (
 )
 
 func TestCitadels(t *testing.T) {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 	rand.Seed(time.Now().UnixNano())
 
 	const gameId = "0"
@@ -28,20 +28,12 @@ func TestCitadels(t *testing.T) {
 
 	start := time.Now()
 
+	time.Sleep(10 * time.Millisecond)
+
 	var games int
 	for games < 100 {
 		if time.Now().Sub(start) > 10 * time.Second {
 			t.Fatal("Stuck", citadels.State)
-		}
-
-	drain:
-		for {
-			select {
-			case <-p1Conn.Msgs:
-			case <-p2Conn.Msgs:
-			default:
-				break drain
-			}
 		}
 
 		var player string
@@ -60,6 +52,7 @@ func TestCitadels(t *testing.T) {
 			b, _ := json.Marshal(rand.Intn(8))
 			game.Cmd <- &wg.Command{player, conn, cmdChoose, game.Version, b}
 		case goldOrDraw:
+			log.Println("TURN:", player)
 			p := citadels.Players[citadels.Turn.Value]
 			log.Println("I have", len(p.Districts), "districts and", p.Gold, "gold")
 			var b json.RawMessage
@@ -94,7 +87,5 @@ func TestCitadels(t *testing.T) {
 		default:
 			log.Fatal("ERROR:", citadels.State)
 		}
-
-		time.Sleep(1* time.Millisecond)
 	}
 }

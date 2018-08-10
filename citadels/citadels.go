@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"encoding/json"
 	"sort"
+	"fmt"
 )
 
 type Citadels struct {
@@ -22,8 +23,7 @@ type Citadels struct {
 	characters    []*ChoosableCharacter // the characters in this game (since characters can be substituted)
 	districtDeck  []*District
 	crown         Circular // tracks who practically has the crown (doesn't move until next turn)
-	lastRoundKing bool
-	FirstToEight  int `json:",omitempty"`
+	FirstToEight  int
 
 	Kill int // assassin chose to kill this player
 }
@@ -294,7 +294,7 @@ func (c *Citadels) handleStart(cmd *wg.Command) bool {
 
 	c.State = choose
 	c.Kill = -1
-	c.lastRoundKing = false
+	c.FirstToEight = -1
 
 	// remove unconnected players and shuffle them, leader always starts in position 1
 	{
@@ -399,13 +399,11 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 	}
 
 	if choice > 8 || choice < 0 {
-		log.Println("Invalid choice")
 		sendMsg(p.ws, "Invalid choice")
 		return false
 	}
 
 	if c.characters[choice].Chosen {
-		log.Println("Character already chosen")
 		sendMsg(p.ws, "Character already chosen")
 		return false
 	}
@@ -507,8 +505,14 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 		// give two cards, they will return one next
 		c.State = putCardBack
 		p.hand = append(p.hand, c.districtDeck[:2]...)
+		c.districtDeck = c.districtDeck[2:]
 		log.Println("Player chose districts")
 		return true
+	}
+
+	if c.State != putCardBack {
+		panic(fmt.Sprintln("Wrong state:", c.State))
+		return false
 	}
 
 	var choices []int
@@ -544,16 +548,19 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 	p, _ := Find(c.Players, cmd.PlayerId)
 	if p != c.Players[c.Turn.Value] {
+		log.Println("Not your turn yet")
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
 	if c.State != build {
+		log.Println("Not time to build")
 		sendMsg(p.ws, "It's not time to build")
 		return false
 	}
 
 	var choices []int
 	if err := json.Unmarshal(cmd.Data, &choices); err != nil {
+		log.Println(err)
 		sendMsg(p.ws, "Couldn't unmarshal choice")
 		return false
 	}
@@ -563,11 +570,12 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 		return true
 	}
 
-	if c.Turn.Value == 6 && c.characters[6].Character == Architect && len(choices) > 3 {
+	if c.CharCur == 6 && c.characters[6].Character == Architect && len(choices) > 3 {
 		sendMsg(p.ws, "Architect can only build up to three times per round")
 		return false
 	} else {
 		if len(choices) > 1 {
+			log.Println("Player tried to build too many times")
 			sendMsg(p.ws, "Only architect can build more than once per round")
 			return false
 		}
@@ -587,6 +595,7 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 		}
 		for _, district := range p.Districts {
 			if district.Name == chosenDistrict.Name {
+				log.Println("Duplicates!", district.Name, chosenDistrict.Name)
 				sendMsg(p.ws, "Can't have duplicate districts")
 				return false
 			}
@@ -607,11 +616,23 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 		p.hand = append(p.hand[:choice], p.hand[choice+1:]...)
 	}
 
+	if len(p.Districts) >= 8 && c.FirstToEight == -1 {
+		c.FirstToEight = c.Turn.Value
+	}
+
 	c.State = endTurn
 	return true
 }
 
 func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
+	p, _ := Find(c.Players, cmd.PlayerId)
+	if p != c.Players[c.Turn.Value] {
+		sendMsg(p.ws, "Not your turn yet")
+		return false
+	}
+
+	log.Println("Player ended turn")
+
 	// next player's turn?
 	for c.CharCur += 1; c.CharCur < 8; c.CharCur++ {
 		if c.characters[c.CharCur].player != nil {

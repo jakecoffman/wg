@@ -28,8 +28,9 @@ func TestCitadels(t *testing.T) {
 
 	start := time.Now()
 
-	for {
-		if time.Now().Sub(start) > 3 * time.Second {
+	var games int
+	for games < 100 {
+		if time.Now().Sub(start) > 10 * time.Second {
 			t.Fatal("Stuck", citadels.State)
 		}
 
@@ -59,18 +60,33 @@ func TestCitadels(t *testing.T) {
 			b, _ := json.Marshal(rand.Intn(8))
 			game.Cmd <- &wg.Command{player, conn, cmdChoose, game.Version, b}
 		case goldOrDraw:
-			b, _ := json.Marshal(rand.Intn(2))
+			p := citadels.Players[citadels.Turn.Value]
+			log.Println("I have", len(p.Districts), "districts and", p.Gold, "gold")
+			var b json.RawMessage
+			if len(p.hand) < 4 {
+				log.Println("I took districts")
+				b, _ = json.Marshal(1)
+			} else {
+				log.Println("I took gold")
+				b, _ = json.Marshal(0)
+			}
 			game.Cmd <- &wg.Command{player, conn, cmdAction, game.Version, b}
 		case putCardBack:
 			length := len(citadels.Players[citadels.Turn.Value].hand)
 			b, _ := json.Marshal([]int{length - (1+rand.Intn(2))})
 			game.Cmd <- &wg.Command{player, conn, cmdAction, game.Version, b}
 		case build:
-			hand := citadels.Players[citadels.Turn.Value].hand
-			b, _ := json.Marshal([]int{rand.Intn(len(hand))})
+			p := citadels.Players[citadels.Turn.Value]
+			for i := range p.hand {
+				b, _ := json.Marshal([]int{i})
+				game.Cmd <- &wg.Command{player, conn, cmdBuild, game.Version, b}
+			}
+			b, _ := json.Marshal([]int{})
 			game.Cmd <- &wg.Command{player, conn, cmdBuild, game.Version, b}
 		case endTurn:
+			game.Cmd <- &wg.Command{player, conn, cmdEnd, game.Version, nil}
 		case gameOver:
+			return
 			game.Cmd <- &wg.Command{player1, p1Conn, cmdReady, game.Version, nil}
 			game.Cmd <- &wg.Command{player2, p2Conn, cmdReady, game.Version, nil}
 		case lobby:
@@ -78,5 +94,7 @@ func TestCitadels(t *testing.T) {
 		default:
 			log.Fatal("ERROR:", citadels.State)
 		}
+
+		time.Sleep(1* time.Millisecond)
 	}
 }

@@ -17,13 +17,13 @@ type Citadels struct {
 	Players      []*Player
 	playerCursor int
 
-	Turn          Circular // used to tell whose turn it is
-	CharCur       int
-	State         State
-	characters    []*ChoosableCharacter // the characters in this game (since characters can be substituted)
-	districtDeck  []*District
-	crown         Circular // tracks who practically has the crown (doesn't move until next turn)
-	FirstToEight  int
+	Turn         Circular // used to tell whose turn it is
+	CharCur      int
+	State        State
+	characters   []*ChoosableCharacter // the characters in this game (since characters can be substituted)
+	districtDeck []*District
+	crown        Circular // tracks who practically has the crown (doesn't move until next turn)
+	FirstToEight int
 
 	Kill int // assassin chose to kill this player
 }
@@ -69,6 +69,7 @@ type Player struct {
 	Districts []*District
 
 	score int
+	IsReady bool `json:",omitempty"`
 }
 
 func NewGame(id string) *wg.Game {
@@ -89,6 +90,8 @@ func (c *Citadels) reset() {
 	for _, p := range c.Players {
 		p.Gold = 2
 		p.HasCrown = false
+		p.Districts = []*District{}
+		p.IsReady = false
 	}
 }
 
@@ -206,6 +209,8 @@ func (c *Citadels) handler(cmd *wg.Command) bool {
 		return c.handleSpecial(cmd)
 	case cmdEnd:
 		return c.handleEndTurn(cmd)
+	case cmdReady:
+		return c.handleReady(cmd)
 	default:
 		log.Println("Unknown message:", cmd.Type)
 		return false
@@ -737,6 +742,26 @@ func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 	}
 
 	return false
+}
+
+func (c *Citadels) handleReady(cmd *wg.Command) bool {
+	if c.State != gameOver {
+		return false
+	}
+	allReady := true
+	for _, p := range c.Players {
+		if p.Uuid == cmd.PlayerId {
+			p.IsReady = !p.IsReady
+		}
+		if !p.IsBot && !p.IsReady {
+			allReady = false
+		}
+	}
+	if allReady {
+		c.Version += 1
+		c.reset()
+	}
+	return true
 }
 
 // This info is sent once at the beginning of each game (and when users reconnect)

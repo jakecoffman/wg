@@ -31,9 +31,19 @@ func TestCitadels(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	var games int
-	for games < 100 {
-		if time.Now().Sub(start) > 10 * time.Second {
+	for games < 10 {
+		if time.Now().Sub(start) > 30 * time.Second {
 			t.Fatal("Stuck", citadels.State)
+		}
+
+	drain:
+		for {
+			select {
+			case <-p1Conn.Msgs:
+			case <-p2Conn.Msgs:
+			default:
+				break drain
+			}
 		}
 
 		var player string
@@ -79,7 +89,7 @@ func TestCitadels(t *testing.T) {
 		case endTurn:
 			game.Cmd <- &wg.Command{player, conn, cmdEnd, game.Version, nil}
 		case gameOver:
-			return
+			games++
 			game.Cmd <- &wg.Command{player1, p1Conn, cmdReady, game.Version, nil}
 			game.Cmd <- &wg.Command{player2, p2Conn, cmdReady, game.Version, nil}
 		case lobby:
@@ -87,5 +97,7 @@ func TestCitadels(t *testing.T) {
 		default:
 			log.Fatal("ERROR:", citadels.State)
 		}
+
+		time.Sleep(10 * time.Millisecond)
 	}
 }

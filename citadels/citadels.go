@@ -32,6 +32,14 @@ type ChoosableCharacter struct {
 	*Character
 	Chosen bool    // lets the frontend know that character has been chosen or discarded
 	player *Player // point back to the player that is assigned this round
+	HasTaxed, HasSpecialed bool
+}
+
+func (c *ChoosableCharacter) reset() {
+	c.Chosen = false
+	c.HasTaxed = false
+	c.HasSpecialed = false
+	c.player = nil
 }
 
 type Circular struct {
@@ -68,7 +76,7 @@ type Player struct {
 	hand      []*District
 	Districts []*District
 
-	score int
+	Score   int
 	IsReady bool `json:",omitempty"`
 }
 
@@ -147,10 +155,11 @@ const (
 	cmdChoose = "choose"
 
 	// turn actions
-	cmdAction = "action"
-	cmdBuild  = "build"
-	cmdPowers = "powers"
-	cmdEnd    = "end"
+	cmdAction  = "action"
+	cmdBuild   = "build"
+	cmdSpecial = "special"
+	cmdTax     = "tax"
+	cmdEnd     = "end"
 )
 
 func (c *Citadels) run() {
@@ -205,8 +214,10 @@ func (c *Citadels) handler(cmd *wg.Command) bool {
 		return c.handleAction(cmd)
 	case cmdBuild:
 		return c.handleBuild(cmd)
-	case cmdPowers:
+	case cmdSpecial:
 		return c.handleSpecial(cmd)
+	case cmdTax:
+		return c.handleTax(cmd)
 	case cmdEnd:
 		return c.handleEndTurn(cmd)
 	case cmdReady:
@@ -477,7 +488,6 @@ func (c *Citadels) handleChoose(cmd *wg.Command) bool {
 		}
 	}
 
-	log.Println("Player made a character choice")
 	return true
 }
 
@@ -512,7 +522,6 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 		if choice == 0 {
 			p.Gold += 2
 			c.State = build
-			log.Println("Player chose gold")
 			return true
 		}
 		// give two cards, they will return one next
@@ -554,7 +563,6 @@ func (c *Citadels) handleAction(cmd *wg.Command) bool {
 	// drop the last card off their deck
 	p.hand = p.hand[:len(p.hand)-1]
 	c.State = build
-	log.Println("Player returned a district")
 	return true
 }
 
@@ -566,7 +574,6 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 		return false
 	}
 	if c.State != build {
-		log.Println("Not time to build")
 		sendMsg(p.ws, "It's not time to build")
 		return false
 	}
@@ -608,7 +615,6 @@ func (c *Citadels) handleBuild(cmd *wg.Command) bool {
 		}
 		for _, district := range p.Districts {
 			if district.Name == chosenDistrict.Name {
-				log.Println("Duplicates!", district.Name, chosenDistrict.Name)
 				sendMsg(p.ws, "Can't have duplicate districts")
 				return false
 			}
@@ -645,8 +651,6 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 		return false
 	}
 
-	log.Println("Player ended turn")
-
 	// next player's turn?
 	for c.CharCur += 1; c.CharCur < 8; c.CharCur++ {
 		if c.characters[c.CharCur].player != nil {
@@ -655,6 +659,7 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 				c.crown.Value = c.Turn.Value
 			}
 			if c.Kill == c.CharCur {
+				sendMsg(c.Players[c.Turn.Value].ws, "You were killed by the Assassin")
 				continue
 			}
 			c.State = goldOrDraw
@@ -665,10 +670,10 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 	// end of round, check for win condition and winner
 
 	for _, p := range c.Players {
-		p.score = 0
+		p.Score = 0
 		colors := [5]int{}
 		for _, card := range p.Districts {
-			p.score += card.Value
+			p.Score += card.Value
 			colors[int(card.Color)]++
 		}
 		allColors := true
@@ -679,10 +684,10 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 			}
 		}
 		if allColors {
-			p.score += 3
+			p.Score += 3
 		}
 		if c.FirstToEight == p.Id {
-			p.score += 4
+			p.Score += 4
 		}
 		if len(p.Districts) >= 8 {
 			c.State = gameOver
@@ -700,8 +705,7 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 		c.Turn.Max = len(c.Players)
 		c.Kill = -1
 		for _, char := range c.characters {
-			char.Chosen = false
-			char.player = nil
+			char.reset()
 		}
 		// TODO: this is two player variant only
 		if len(c.Players) == 2 {
@@ -712,24 +716,18 @@ func (c *Citadels) handleEndTurn(cmd *wg.Command) bool {
 	return true
 }
 
-func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
+func (c *Citadels) handleTax(cmd *wg.Command) bool {
 	p, _ := Find(c.Players, cmd.PlayerId)
 	if p != c.Players[c.Turn.Value] {
 		sendMsg(p.ws, "Not your turn yet")
 		return false
 	}
 
-	var choice int
-	if err := json.Unmarshal(cmd.Data, &choice); err != nil {
-		log.Println(err)
-		sendMsg(p.ws, "Couldn't decode choice")
-		return false
-	}
-
 	character := c.characters[c.CharCur]
 
-	if choice == 0 {
-		return character.special(c, p, cmd.Data)
+	if character.HasTaxed {
+		sendMsg(p.ws, "You already taxed")
+		return false
 	}
 
 	if character.CanTax != None {
@@ -738,10 +736,32 @@ func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
 				p.Gold++
 			}
 		}
+		character.HasTaxed = true
 		return true
 	}
 
 	return false
+}
+
+func (c *Citadels) handleSpecial(cmd *wg.Command) bool {
+	p, _ := Find(c.Players, cmd.PlayerId)
+	if p != c.Players[c.Turn.Value] {
+		sendMsg(p.ws, "Not your turn yet")
+		return false
+	}
+
+	character := c.characters[c.CharCur]
+
+	if character.HasSpecialed {
+		sendMsg(p.ws, "You already special'd")
+		return false
+	}
+
+	done := character.special(c, p, cmd.Data)
+	if done {
+		character.HasSpecialed = true
+	}
+	return done
 }
 
 func (c *Citadels) handleReady(cmd *wg.Command) bool {

@@ -35,9 +35,15 @@ var Thief = &Character{
 			sendMsg(player.ws, "Couldn't unmarshal choice")
 			return false
 		}
-		if choice < 2 || choice > 8 || choice == c.Kill {
+		if choice < 2 || choice >= 8 || choice == c.Kill {
 			sendMsg(player.ws, "Cannot steal from assassin or assassin's target")
 			return false
+		}
+		target := c.characters[choice].player
+		if target != nil {
+			player.Gold += target.Gold
+			target.Gold = 0
+			sendMsg(target.ws, "Thief stole all of your gold")
 		}
 		return true
 	},
@@ -57,7 +63,7 @@ var Magician = &Character{
 		}
 		if choice.Swap != nil {
 			value := *choice.Swap
-			if value < 0 || value == 2 || value > 8 {
+			if value < 0 || value == 2 || value >= 8 {
 				sendMsg(player.ws, "Invalid card swap target")
 				return false
 			}
@@ -126,19 +132,44 @@ var Architect = &Character{
 	},
 }
 
+type warlordAction struct {
+	Player int
+	District int
+}
+
 var Warlord = &Character{
 	"Warlord",
 	Red,
 	func(c *Citadels, player *Player, data json.RawMessage) bool {
-		var choice struct {
-			Swap   *int
-			Redraw []int
-		}
+		var choice warlordAction
 		if err := json.Unmarshal(data, &choice); err != nil {
 			sendMsg(player.ws, "Couldn't unmarshal choice")
 			return false
 		}
-		// TODO destroy
+		if choice.Player < 0 || choice.Player > len(c.Players){
+			sendMsg(player.ws, "Invalid player")
+			return false
+		}
+		p := c.Players[choice.Player]
+		if c.characters[4].Character == Bishop && c.characters[4].player == p {
+			sendMsg(player.ws, "Bishop is immune to Warlord")
+			return false
+		}
+		if choice.District < 0 || choice.District > len(p.Districts) {
+			sendMsg(player.ws, "Invalid district")
+			return false
+		}
+		d := p.Districts[choice.District]
+		if d.Value - 1 > player.Gold {
+			sendMsg(player.ws, "You need more gold to destroy that")
+			return false
+		}
+		if p != player {
+			sendMsg(p.ws, "Warlord has destroyed your "+d.Name)
+			sendMsg(player.ws, "You destroyed that player's "+d.Name)
+		} else {
+			sendMsg(player.ws, "You destroyed your "+d.Name)
+		}
 		return true
 	},
 }

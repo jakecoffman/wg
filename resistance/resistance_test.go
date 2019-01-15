@@ -1,13 +1,13 @@
 package resistance
 
 import (
-	"testing"
-	"github.com/jakecoffman/wg"
-	"github.com/gin-gonic/gin/json"
-	"math/rand"
-	"log"
-	"time"
+	"encoding/json"
 	"fmt"
+	"github.com/jakecoffman/wg"
+	"log"
+	"math/rand"
+	"testing"
+	"time"
 )
 
 func TestResistance(t *testing.T) {

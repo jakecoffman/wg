@@ -1,13 +1,18 @@
-package resistance
+package justone
 
 import (
 	"encoding/json"
 	"github.com/jakecoffman/wg"
 	"log"
+	"math/rand"
 	"runtime/debug"
 	"strings"
 	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 type JustOne struct {
 	*wg.Game
@@ -28,7 +33,7 @@ type Player struct {
 	Name      string
 	Connected bool
 	Ip        string `json:"-"`
-	ready     bool
+	Ready     bool
 	Clue      string `json:"-"`
 	IsGuesser bool
 }
@@ -209,7 +214,7 @@ func (g *JustOne) handleDisconnect(cmd *wg.Command) bool {
 func (g *JustOne) handleName(cmd *wg.Command) bool {
 	p, _ := Find(g.Players, cmd.PlayerId)
 	if g.State != stateLobby && p.Name != "" {
-		sendMsg(p.ws, "Wait for the lobby to change your name again")
+		sendMsg(p.ws, "Can only change name in the lobby")
 		return false
 	}
 
@@ -238,10 +243,10 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 		return false
 	}
 
-	p.ready = true
+	p.Ready = true
 	for _, player := range g.Players {
 		player.Clue = ""
-		if !player.ready {
+		if !player.Ready {
 			return true
 		}
 	}
@@ -250,6 +255,7 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 	if g.guesserCursor > len(g.Players) {
 		g.guesserCursor = 0
 	}
+	g.GuessMe = wordlist[rand.Intn(len(wordlist))]
 
 	return true
 }
@@ -267,10 +273,14 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		return false
 	}
 
-	p.Clue = string(cmd.Data)
+	err := json.Unmarshal(cmd.Data, &p.Clue)
+	if err != nil {
+		sendMsg(p.ws, err.Error())
+		return false
+	}
 
 	for _, player := range g.Players {
-		player.ready = false
+		player.Ready = false
 		if player.Clue == "" {
 			return false
 		}
@@ -288,14 +298,20 @@ func (g *JustOne) handleReconcile(cmd *wg.Command) bool {
 		return false
 	}
 
-	p.ready = true
+	p.Ready = true
 
-	if string(cmd.Data) == "dupe" {
+	var answer string
+	err := json.Unmarshal(cmd.Data, &answer)
+	if err != nil {
+		sendMsg(p.ws, err.Error())
+		return false
+	}
+	if answer == "dupe" {
 		p.Clue = ""
 	}
 
 	for _, player := range g.Players {
-		if !player.ready {
+		if !player.Ready {
 			return false
 		}
 	}
@@ -318,10 +334,16 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 	}
 
 	g.State = stateEnd
-	g.Win = strings.ToUpper(string(cmd.Data)) == g.GuessMe
+	var guess string
+	err := json.Unmarshal(cmd.Data, &guess)
+	if err != nil {
+		sendMsg(p.ws, err.Error())
+		return false
+	}
+	g.Win = strings.ToUpper(guess) == g.GuessMe
 
 	for _, player := range g.Players {
-		player.ready = false
+		player.Ready = false
 	}
 	g.State = stateEnd
 

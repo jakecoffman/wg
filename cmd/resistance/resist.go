@@ -22,7 +22,7 @@ func main() {
 		_, _ = w.Write([]byte(`[{
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target" : { "namespace": "android_app", "package_name": "com.jakecoffman.spytown",
-               "sha256_cert_fingerprints": ["B4:9D:C1:38:30:3E:32:5E:1E:25:72:5E:0A:87:B9:D4:F7:49:14:BC:DA:C3:E9:E4:AC:1F:15:A6:20:4C:3E:A7"] }
+               "sha256_cert_fingerprints": ["F1:68:01:70:C3:51:03:78:53:95:4C:24:FA:AC:A8:2B:79:65:F4:BD:B2:AF:A5:34:85:62:7E:FB:46:4F:A5:84"] }
 }]`))
 	})
 	port := "8112"

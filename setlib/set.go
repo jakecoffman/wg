@@ -96,8 +96,16 @@ func (g *Set) disconnect(cmd *wg.Command) {
 
 func (g *Set) ready(cmd *wg.Command) {
 	p := g.players[cmd.PlayerId]
+
+	var ready bool
+	err := json.Unmarshal(cmd.Data, &ready)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
 	if p != nil {
-		p.Ready = true
+		p.Ready = ready
 		g.sendMetaToEveryone()
 	}
 }

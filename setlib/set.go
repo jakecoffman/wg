@@ -26,8 +26,10 @@ type Player struct {
 	ws        wg.Connector
 	Id        int
 	Score     int
-	Connected bool
+	Connected bool `json:",omitempty"`
 	ip        string
+	Ready     bool `json:",omitempty"`
+	Name      string `json:",omitempty"`
 }
 
 func NewGame(id string) *wg.Game {
@@ -46,6 +48,8 @@ const (
 	cmdJoin       = "join"
 	cmdLeave      = "leave"
 	cmdDisconnect = "disconnect"
+	cmdReady      = "ready"
+	cmdRename     = "rename"
 	cmdPlay       = "play"
 	cmdNoSets     = "nosets"
 	cmdStop       = "stop"
@@ -62,6 +66,10 @@ func (g *Set) run() {
 			g.leave(cmd)
 		case cmdDisconnect:
 			g.disconnect(cmd)
+		case cmdReady:
+			g.ready(cmd)
+		case cmdRename:
+			g.rename(cmd)
 		case cmdNoSets:
 			g.noSets(cmd)
 		case cmdPlay:
@@ -80,10 +88,39 @@ func (g *Set) run() {
 func (g *Set) disconnect(cmd *wg.Command) {
 	p := g.players[cmd.PlayerId]
 	if p != nil {
-		g.players[cmd.PlayerId].ws = nil
-		g.players[cmd.PlayerId].Connected = false
+		p.ws = nil
+		p.Connected = false
 		g.sendMetaToEveryone()
 	}
+}
+
+func (g *Set) ready(cmd *wg.Command) {
+	p := g.players[cmd.PlayerId]
+	if p != nil {
+		p.Ready = true
+		g.sendMetaToEveryone()
+	}
+}
+
+func (g *Set) rename(cmd *wg.Command) {
+	p := g.players[cmd.PlayerId]
+	if p == nil {
+		return
+	}
+
+	var name string
+	err := json.Unmarshal(cmd.Data, &name)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if len(name) > 8 {
+		p.Name = name[0:8]
+	} else {
+		p.Name = name
+	}
+	g.sendMetaToEveryone()
 }
 
 func (g *Set) leave(cmd *wg.Command) {
@@ -157,10 +194,18 @@ func (g *Set) sendEveryoneCheats() {
 }
 
 func (g *Set) sendMetaToEveryone() {
+	playing := true
+	for _, p := range g.players {
+		if p.Ready != true {
+			playing = false
+			break
+		}
+	}
 	msg := MetaMsg{
 		Type:    "meta",
 		Players: g.SlicePlayers(),
 		GameId:  g.Id,
+		Playing: playing,
 		Version: g.Version,
 	}
 	for _, player := range g.players {
@@ -376,6 +421,7 @@ type MetaMsg struct {
 	Players []*Player
 	Version int
 	You     int
+	Playing bool
 }
 
 type PlayMsg struct {

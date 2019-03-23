@@ -389,7 +389,7 @@ func (g *Set) SlicePlayers() []*Player {
 	for _, p := range g.players {
 		players = append(players, p)
 	}
-	sort.Slice(players, func(i, j int) bool {
+	sort.SliceStable(players, func(i, j int) bool {
 		return players[i].Score >= players[j].Score
 	})
 	return players

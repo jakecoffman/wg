@@ -142,6 +142,16 @@ func (g *Set) join(cmd *wg.Command) {
 	if player, ok = g.players[cmd.PlayerId]; !ok {
 		// player was not here before, create
 		player = &Player{Id: g.playerCursor}
+		// mark player as ready if game already started
+		if len(g.players) > 0 {
+			player.Ready = true
+			for _, p := range g.players {
+				if !p.Ready {
+					player.Ready = false
+					break
+				}
+			}
+		}
 		g.players[cmd.PlayerId] = player
 		g.playerCursor += 1
 	}

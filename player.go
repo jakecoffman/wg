@@ -18,6 +18,7 @@ func GenId() string {
 
 const (
 	cmdDisconnect = "disconnect"
+	cmdRejoin     = "rejoin"
 	cmdJoin       = "join"
 	cmdLeave      = "leave"
 	cmdStop       = "stop"
@@ -50,6 +51,15 @@ func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
 			cmd.Ws = ws
 			cmd.PlayerId = playerId
 			switch cmd.Type {
+			case cmdRejoin:
+				game = AllGames.Find(playerId)
+				if game == nil {
+					id = GenId()
+					game = NewGame(id)
+					AllGames.Set(game, playerId)
+				}
+				cmd.Type = cmdJoin
+				game.Cmd <- cmd
 			case cmdJoin:
 				if game != nil {
 					game.Cmd <- &Command{Type: cmdLeave, PlayerId: playerId}
@@ -64,13 +74,12 @@ func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
 				// new
 				if id == "" {
 					id = GenId()
-					AllGames.Set(NewGame(id))
-				}
-
-				if game = AllGames.Get(id); game == nil {
+					game = NewGame(id)
+					AllGames.Set(game, playerId)
+				} else if game = AllGames.Get(id); game == nil {
 					id = GenId()
 					game = NewGame(id)
-					AllGames.Set(game)
+					AllGames.Set(game, playerId)
 				}
 				game.Cmd <- cmd
 			case cmdStop:

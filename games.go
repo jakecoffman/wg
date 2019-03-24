@@ -48,10 +48,14 @@ func NewGame(class interface{}, id string) *Game {
 type Games struct {
 	sync.RWMutex
 	games map[string]*Game
+	players map[string]*Game
 }
 
 func NewGames() *Games {
-	return &Games{games: map[string]*Game{}}
+	return &Games{
+		games: map[string]*Game{},
+		players: map[string]*Game{},
+	}
 }
 
 func (g *Games) Ids() []string {
@@ -70,18 +74,30 @@ func (g *Games) Get(id string) *Game {
 	return g.games[id]
 }
 
-func (g *Games) Set(game *Game) {
+func (g *Games) Set(game *Game, pid string) {
 	if game.Id == "" {
 		// this is programmer error, ok with panic
 		panic("game needs an ID")
 	}
 	g.Lock()
 	g.games[game.Id] = game
+	g.players[pid] = game
 	g.Unlock()
 }
 
 func (g *Games) Delete(id string) {
 	g.Lock()
 	delete(g.games, id)
+	for pid, game := range g.players {
+		if game.Id == id {
+			defer delete(g.players, pid)
+		}
+	}
 	g.Unlock()
+}
+
+func (g *Games) Find(pid string) *Game {
+	g.RLock()
+	defer g.RUnlock()
+	return g.players[pid]
 }

@@ -170,7 +170,7 @@ func (g *Set) sendEverythingTo(ws wg.Connector) {
 	update := UpdateMsg{
 		Type:    "all",
 		Updates: []Update{},
-		Players: g.SlicePlayers(),
+		Players: g.players,
 		Version: g.Version,
 	}
 
@@ -186,7 +186,7 @@ func (g *Set) sendEveryoneEverything() {
 	update := UpdateMsg{
 		Type:    "all",
 		Updates: []Update{},
-		Players: g.SlicePlayers(),
+		Players: g.players,
 		Version: g.Version,
 	}
 
@@ -221,7 +221,7 @@ func (g *Set) sendMetaToEveryone() {
 	}
 	msg := MetaMsg{
 		Type:    "meta",
-		Players: g.SlicePlayers(),
+		Players: g.players,
 		GameId:  g.Id,
 		Playing: playing,
 		Version: g.Version,
@@ -291,7 +291,7 @@ func (g *Set) noSets(cmd *wg.Command) {
 	g.Version += 1
 	update := UpdateMsg{
 		Type:    "update",
-		Players: g.SlicePlayers(),
+		Players: g.players,
 		Version: g.Version,
 		Updates: []Update{
 			{Location: len(g.board) - 3, Card: g.board[len(g.board)-3]},
@@ -356,7 +356,7 @@ func (g *Set) play(cmd *wg.Command) {
 	g.cursor += 3
 	update := &UpdateMsg{
 		Type:    "update",
-		Players: g.SlicePlayers(),
+		Players: g.players,
 		Version: g.Version,
 		Updates: []Update{
 			{Location: play[0], Card: g.board[play[0]]},
@@ -394,37 +394,10 @@ func (g Set) FindSets() [][]int {
 	return sets
 }
 
-func (g *Set) SlicePlayers() []*Player {
-	var players []*Player
-	for _, p := range g.players {
-		players = append(players, p)
-	}
-	sort.SliceStable(players, func(i, j int) bool {
-		return players[i].Score >= players[j].Score
-	})
-	return players
-}
-
-// SlicePlayersAdmin is like SlicePlayers but it exposes sensitive info, so careful!
-func (g *Set) SlicePlayersAdmin() interface{} {
-	type playa struct {
-		*Player
-		Addr string
-	}
-	var players []*playa
-	for _, p := range g.players {
-		players = append(players, &playa{Player: p, Addr: p.ip})
-	}
-	sort.Slice(players, func(i, j int) bool {
-		return players[i].Score >= players[j].Score
-	})
-	return players
-}
-
 type UpdateMsg struct {
 	Type    string
 	Updates []Update
-	Players []*Player
+	Players map[string]*Player
 	Version int
 }
 
@@ -436,7 +409,7 @@ type Update struct {
 type MetaMsg struct {
 	Type    string
 	GameId  string
-	Players []*Player
+	Players map[string]*Player
 	Version int
 	You     int
 	Playing bool

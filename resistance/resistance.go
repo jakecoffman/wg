@@ -7,10 +7,10 @@ import (
 	"github.com/jakecoffman/wg"
 	"log"
 	"math/rand"
-	"strconv"
-	"time"
 	"runtime/debug"
 	"sort"
+	"strconv"
+	"time"
 )
 
 type Resist struct {
@@ -67,6 +67,7 @@ type History struct {
 	Mission     int
 	Assignments []int
 	Votes       map[int]bool
+	Success     *bool
 }
 
 func NewMissions(slots []int) []*Mission {
@@ -574,7 +575,7 @@ func (g *Resist) handleMission(cmd *wg.Command) bool {
 	}
 	thisMission.successVotes[i] = vote
 
-	// voting is done
+	// is voting done?
 	if len(thisMission.successVotes) != len(thisMission.Assignments) {
 		return true
 	}
@@ -597,6 +598,10 @@ func (g *Resist) handleMission(cmd *wg.Command) bool {
 			thisMission.NumFails += 1
 		}
 	}
+
+	// update history to include success or fail
+	g.History[len(g.History)-1].Success = &thisMission.Success
+
 	// check end game by counting up number of successful/failed missions
 	succeeds := 0
 	fails := 0

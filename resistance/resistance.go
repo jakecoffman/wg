@@ -158,10 +158,6 @@ func (g *Resist) run() {
 		}
 		cmd = <-g.Cmd
 
-		if g.Version != cmd.Version {
-			continue
-		}
-
 		switch cmd.Type {
 		case cmdJoin:
 			update = g.handleJoin(cmd)

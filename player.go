@@ -39,6 +39,7 @@ func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
 
 		defer func() {
 			if game != nil {
+				log.Printf("Player %v disconnected\n", playerId)
 				game.Cmd <- &Command{Type: cmdDisconnect, PlayerId: playerId}
 			}
 		}()

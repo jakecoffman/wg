@@ -228,7 +228,7 @@ func (g *JustOne) handleDisconnect(cmd *wg.Command) bool {
 
 func (g *JustOne) handleName(cmd *wg.Command) bool {
 	p, _ := Find(g.Players, cmd.PlayerId)
-	if g.State != stateLobby && p.Name != "" {
+	if g.State != stateLobby && g.State != stateEnd {
 		sendMsg(p.ws, "Can only change name in the lobby")
 		return false
 	}

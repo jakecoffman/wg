@@ -2,6 +2,7 @@ package justone
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/jakecoffman/wg"
 	"log"
 	"math/rand"
@@ -335,6 +336,9 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 	}
 	if strings.ToLower(guess) == strings.ToLower(g.GuessMe) {
 		g.Score++
+		g.sendMsgAll(fmt.Sprintf("Guess '%v' is correct! 😀", guess))
+	} else {
+		g.sendMsgAll(fmt.Sprintf("Guess '%v' is incorrect! 😢", guess))
 	}
 
 	// reset game state

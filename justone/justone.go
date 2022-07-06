@@ -258,6 +258,11 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 		return false
 	}
 
+	if len(g.Players) < 2 {
+		sendMsg(p.ws, "You need at least 2 players")
+		return false
+	}
+
 	p.Ready = true
 	for _, player := range g.Players {
 		player.Clue = ""
@@ -291,6 +296,12 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 	err := json.Unmarshal(cmd.Data, &p.Clue)
 	if err != nil {
 		sendMsg(p.ws, err.Error())
+		return false
+	}
+
+	if strings.ToLower(p.Clue) == strings.ToLower(g.GuessMe) {
+		sendMsg(p.ws, "That's cheating")
+		p.Clue = ""
 		return false
 	}
 

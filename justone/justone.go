@@ -191,10 +191,6 @@ func (g *JustOne) handleJoin(cmd *wg.Command) bool {
 			sendMsg(cmd.Ws, "Can't join game in progress")
 			return false
 		}
-		if len(g.Players) >= 7 {
-			sendMsg(cmd.Ws, "Can't have more than 7 players")
-			return false
-		}
 		player = &Player{Uuid: cmd.PlayerId, Id: g.playerCursor}
 		g.Players = append(g.Players, player)
 		g.playerCursor += 1

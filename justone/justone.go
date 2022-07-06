@@ -142,12 +142,24 @@ func (g *JustOne) run() {
 type UpdateMsg struct {
 	Type   string
 	Update *JustOne
+	You    *You
+}
+
+type You struct {
+	Id        int
+	IsGuesser bool
+	IsReady   bool
 }
 
 func (g *JustOne) sendEveryoneEverything() {
 	for _, p := range g.Players {
 		if p.ws != nil {
 			msg := &UpdateMsg{Type: "all", Update: g}
+			msg.You = &You{
+				Id:        p.Id,
+				IsGuesser: p.IsGuesser,
+				IsReady:   p.Ready,
+			}
 			p.ws.Send(msg)
 		}
 	}
@@ -253,7 +265,9 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 			return true
 		}
 	}
-	g.State = stateGuess
+	g.State = stateWrite
+	g.Score = 0
+	g.Clues = nil
 	g.GuessMe = wordlist[rand.Intn(len(wordlist))]
 	g.Players[rand.Intn(len(g.Players))].IsGuesser = true
 
@@ -281,6 +295,9 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 
 	clues := map[string]struct{}{}
 	for _, player := range g.Players {
+		if player.IsGuesser {
+			continue
+		}
 		player.Ready = false
 		if player.Clue == "" {
 			return false
@@ -292,6 +309,7 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 	for clue := range clues {
 		g.Clues = append(g.Clues, clue)
 	}
+	g.State = stateGuess
 
 	return true
 }
@@ -309,14 +327,13 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 		return false
 	}
 
-	g.State = stateEnd
 	var guess string
 	err := json.Unmarshal(cmd.Data, &guess)
 	if err != nil {
 		sendMsg(p.ws, err.Error())
 		return false
 	}
-	if strings.ToUpper(guess) == g.GuessMe {
+	if strings.ToLower(guess) == strings.ToLower(g.GuessMe) {
 		g.Score++
 	}
 

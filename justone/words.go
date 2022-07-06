@@ -1,6 +1,5 @@
 package justone
 
-// by embedding this in the source I don't have to worry about finding it on disk
 var wordlist = []string{
 	"aardvark",
 	"abacus",

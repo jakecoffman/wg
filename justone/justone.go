@@ -17,13 +17,18 @@ func init() {
 type JustOne struct {
 	*wg.Game
 
-	Players       []*Player
-	playerCursor  int
-	State         string
-	guesserCursor int
+	Players      []*Player
+	playerCursor int
+	State        string
 
-	GuessMe string `json:"-"`
-	Win bool
+	// the word to be guessed
+	GuessMe string
+	// the round number
+	Round int
+	// how many rounds won
+	Score int
+	// list of clues to give to the guesser
+	Clues []string
 }
 
 type Player struct {
@@ -34,8 +39,10 @@ type Player struct {
 	Connected bool
 	Ip        string `json:"-"`
 	Ready     bool
-	Clue      string `json:"-"`
-	IsGuesser bool
+	// the word the player wants to give to the guesser
+	Clue string `json:",omitempty"`
+	// is the player the guesser this round?
+	IsGuesser bool `json:",omitempty"`
 }
 
 // Find returns the player object and the position they are in
@@ -65,11 +72,10 @@ func (g *JustOne) reset() {
 
 // states
 const (
-	stateLobby         = "lobby"
-	stateWrite         = "writing"
-	stateGuess         = "guessing"
-	stateReconcile     = "reconciling"
-	stateEnd           = "end"
+	stateLobby = "lobby"
+	stateWrite = "writing"
+	stateGuess = "guessing"
+	stateEnd   = "end"
 )
 
 // message types
@@ -80,10 +86,9 @@ const (
 	cmdStop       = "stop"
 	cmdName       = "name"
 
-	cmdReady      = "ready" // make a new game, or start current game
-	cmdWrite      = "write"
-	cmdReconcile  = "reconcile"
-	cmdGuess      = "guess"
+	cmdReady = "ready"
+	cmdWrite = "write"
+	cmdGuess = "guess"
 )
 
 func (g *JustOne) run() {
@@ -121,8 +126,6 @@ func (g *JustOne) run() {
 			update = g.handleName(cmd)
 		case cmdWrite:
 			update = g.handleWrite(cmd)
-		case cmdReconcile:
-			update = g.handleReconcile(cmd)
 		case cmdGuess:
 			update = g.handleGuess(cmd)
 		default:
@@ -175,9 +178,8 @@ func (g *JustOne) handleJoin(cmd *wg.Command) bool {
 			sendMsg(cmd.Ws, "Can't join game in progress")
 			return false
 		}
-		if len(g.Players) >= 10 {
-			// can't have more than 10 players
-			sendMsg(cmd.Ws, "Can't have more than 10 players")
+		if len(g.Players) >= 7 {
+			sendMsg(cmd.Ws, "Can't have more than 7 players")
 			return false
 		}
 		player = &Player{Uuid: cmd.PlayerId, Id: g.playerCursor}
@@ -246,16 +248,14 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 	p.Ready = true
 	for _, player := range g.Players {
 		player.Clue = ""
+		player.IsGuesser = false
 		if !player.Ready {
 			return true
 		}
 	}
 	g.State = stateGuess
-	g.guesserCursor++
-	if g.guesserCursor > len(g.Players) {
-		g.guesserCursor = 0
-	}
 	g.GuessMe = wordlist[rand.Intn(len(wordlist))]
+	g.Players[rand.Intn(len(g.Players))].IsGuesser = true
 
 	return true
 }
@@ -279,43 +279,19 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		return false
 	}
 
+	clues := map[string]struct{}{}
 	for _, player := range g.Players {
 		player.Ready = false
 		if player.Clue == "" {
 			return false
 		}
+		clues[player.Clue] = struct{}{}
 	}
-	g.State = stateReconcile
-
-	return true
-}
-
-func (g *JustOne) handleReconcile(cmd *wg.Command) bool {
-	p, _ := Find(g.Players, cmd.PlayerId)
-
-	if g.State != stateReconcile {
-		sendMsg(p.ws, "Not in reconcile state")
-		return false
+	// all clues are in
+	g.Clues = []string{}
+	for clue := range clues {
+		g.Clues = append(g.Clues, clue)
 	}
-
-	p.Ready = true
-
-	var answer string
-	err := json.Unmarshal(cmd.Data, &answer)
-	if err != nil {
-		sendMsg(p.ws, err.Error())
-		return false
-	}
-	if answer == "dupe" {
-		p.Clue = ""
-	}
-
-	for _, player := range g.Players {
-		if !player.Ready {
-			return false
-		}
-	}
-	g.State = stateGuess
 
 	return true
 }
@@ -340,12 +316,32 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 		sendMsg(p.ws, err.Error())
 		return false
 	}
-	g.Win = strings.ToUpper(guess) == g.GuessMe
+	if strings.ToUpper(guess) == g.GuessMe {
+		g.Score++
+	}
 
-	for _, player := range g.Players {
+	// reset game state
+	var guesserIndex int
+	for i, player := range g.Players {
+		if player.IsGuesser {
+			guesserIndex = i
+		}
+		player.Clue = ""
+		player.IsGuesser = false
 		player.Ready = false
 	}
-	g.State = stateEnd
+	guesserIndex++
+	g.Players[guesserIndex%len(g.Players)].IsGuesser = true
+	g.Clues = nil
+
+	g.Round++
+	if g.Round >= 13 {
+		g.State = stateEnd
+	} else {
+		// pick another word from the list
+		g.GuessMe = wordlist[rand.Intn(len(wordlist))]
+		g.State = stateWrite
+	}
 
 	return true
 }

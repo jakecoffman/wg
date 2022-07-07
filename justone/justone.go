@@ -322,8 +322,6 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		return false
 	}
 
-	sendMsg(p.ws, "Waiting for other players")
-
 	g.Clues = g.Clues[0:0]
 	for _, player := range g.Players {
 		if player.IsGuesser {
@@ -331,6 +329,7 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		}
 		player.Ready = false
 		if player.Clue == "" {
+			sendMsg(p.ws, "Waiting for other players")
 			return false
 		}
 		g.Clues = append(g.Clues, Clue{player.Clue, false})

@@ -294,6 +294,10 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 		g.Players[rand.Intn(len(g.Players))].IsGuesser = true
 	}
 
+	for _, p := range g.Players {
+		p.Ready = false
+	}
+
 	return true
 }
 

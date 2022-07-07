@@ -322,6 +322,9 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		return false
 	}
 
+	sendMsg(p.ws, "Waiting for other players")
+
+	g.Clues = g.Clues[0:0]
 	for _, player := range g.Players {
 		if player.IsGuesser {
 			continue

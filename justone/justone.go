@@ -23,13 +23,13 @@ type JustOne struct {
 	State        string
 
 	// the word to be guessed
-	GuessMe string
+	guessMe string
 	// the round number
 	Round int
 	// how many rounds won
 	Score int
 	// list of clues to give to the guesser
-	Clues []Clue
+	clues []Clue
 }
 
 type Clue struct {
@@ -160,6 +160,10 @@ type You struct {
 	IsGuesser bool   `json:",omitempty"`
 	IsReady   bool   `json:",omitempty"`
 	Clue      string `json:",omitempty"`
+
+	// hidden from guesser
+	Clues   []Clue `json:",omitempty"`
+	GuessMe string `json:",omitempty"`
 }
 
 func (g *JustOne) sendEveryoneEverything() {
@@ -171,6 +175,8 @@ func (g *JustOne) sendEveryoneEverything() {
 				IsGuesser: p.IsGuesser,
 				IsReady:   p.Ready,
 				Clue:      p.Clue,
+				Clues:     g.clues,
+				GuessMe:   g.guessMe,
 			}
 			p.ws.Send(msg)
 		}
@@ -286,9 +292,9 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 	}
 	if g.State == stateReconcile {
 		g.State = stateGuess
-		for i := 0; i < len(g.Clues); {
-			if g.Clues[i].Dupe {
-				g.Clues = append(g.Clues[:i], g.Clues[i+1:]...)
+		for i := 0; i < len(g.clues); {
+			if g.clues[i].Dupe {
+				g.clues = append(g.clues[:i], g.clues[i+1:]...)
 			} else {
 				i++
 			}
@@ -296,8 +302,8 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 	} else {
 		g.State = stateWrite
 		g.Score = 0
-		g.Clues = nil
-		g.GuessMe = wordlist[rand.Intn(len(wordlist))]
+		g.clues = nil
+		g.guessMe = wordlist[rand.Intn(len(wordlist))]
 		g.Players[rand.Intn(len(g.Players))].IsGuesser = true
 	}
 
@@ -327,13 +333,13 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		return false
 	}
 
-	if Equalish(p.Clue, g.GuessMe) {
+	if Equalish(p.Clue, g.guessMe) {
 		sendMsg(p.ws, "That's cheating")
 		p.Clue = ""
 		return false
 	}
 
-	g.Clues = g.Clues[0:0]
+	g.clues = g.clues[0:0]
 	for _, player := range g.Players {
 		if player.IsGuesser {
 			continue
@@ -343,7 +349,7 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 			sendMsg(p.ws, "Waiting for other players")
 			return true
 		}
-		g.Clues = append(g.Clues, Clue{player.Clue, false})
+		g.clues = append(g.clues, Clue{player.Clue, false})
 	}
 	g.State = stateReconcile
 
@@ -364,8 +370,8 @@ func (g *JustOne) handleReconcile(cmd *wg.Command) bool {
 		return false
 	}
 
-	for i := range g.Clues {
-		c := &g.Clues[i]
+	for i := range g.clues {
+		c := &g.clues[i]
 		if c.Text == clue.Text {
 			c.Dupe = clue.Dupe
 		}
@@ -393,11 +399,11 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 		sendMsg(p.ws, err.Error())
 		return false
 	}
-	if Equalish(guess, g.GuessMe) {
+	if Equalish(guess, g.guessMe) {
 		g.Score++
 		g.sendMsgAll(fmt.Sprintf("Guess '%v' is correct! 😀", guess))
 	} else {
-		g.sendMsgAll(fmt.Sprintf("Guess '%v' 'is incorrect! The word was %v 😢", guess, g.GuessMe))
+		g.sendMsgAll(fmt.Sprintf("Guess '%v' 'is incorrect! The word was %v 😢", guess, g.guessMe))
 	}
 
 	// reset game state
@@ -412,14 +418,14 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 	}
 	guesserIndex++
 	g.Players[guesserIndex%len(g.Players)].IsGuesser = true
-	g.Clues = nil
+	g.clues = nil
 
 	g.Round++
 	if g.Round >= 13 {
 		g.State = stateEnd
 	} else {
 		// pick another word from the list
-		g.GuessMe = wordlist[rand.Intn(len(wordlist))]
+		g.guessMe = wordlist[rand.Intn(len(wordlist))]
 		g.State = stateWrite
 	}
 

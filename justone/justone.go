@@ -157,8 +157,9 @@ type UpdateMsg struct {
 
 type You struct {
 	Id        int
-	IsGuesser bool
-	IsReady   bool
+	IsGuesser bool   `json:",omitempty"`
+	IsReady   bool   `json:",omitempty"`
+	Clue      string `json:",omitempty"`
 }
 
 func (g *JustOne) sendEveryoneEverything() {
@@ -169,6 +170,7 @@ func (g *JustOne) sendEveryoneEverything() {
 				Id:        p.Id,
 				IsGuesser: p.IsGuesser,
 				IsReady:   p.Ready,
+				Clue:      p.Clue,
 			}
 			p.ws.Send(msg)
 		}
@@ -268,7 +270,12 @@ func (g *JustOne) handleReady(cmd *wg.Command) bool {
 		return false
 	}
 
-	p.Ready = true
+	err := json.Unmarshal(cmd.Data, &p.Ready)
+	if err != nil {
+		sendMsg(p.ws, err.Error())
+		return false
+	}
+
 	for _, player := range g.Players {
 		if g.State == stateReconcile && player.IsGuesser {
 			continue
@@ -320,7 +327,7 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		return false
 	}
 
-	if strings.ToLower(p.Clue) == strings.ToLower(g.GuessMe) {
+	if Equalish(p.Clue, g.GuessMe) {
 		sendMsg(p.ws, "That's cheating")
 		p.Clue = ""
 		return false
@@ -334,7 +341,7 @@ func (g *JustOne) handleWrite(cmd *wg.Command) bool {
 		player.Ready = false
 		if player.Clue == "" {
 			sendMsg(p.ws, "Waiting for other players")
-			return false
+			return true
 		}
 		g.Clues = append(g.Clues, Clue{player.Clue, false})
 	}
@@ -386,11 +393,11 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 		sendMsg(p.ws, err.Error())
 		return false
 	}
-	if strings.ToLower(guess) == strings.ToLower(g.GuessMe) {
+	if Equalish(guess, g.GuessMe) {
 		g.Score++
 		g.sendMsgAll(fmt.Sprintf("Guess '%v' is correct! 😀", guess))
 	} else {
-		g.sendMsgAll(fmt.Sprintf("Guess '%v' is incorrect! 😢", guess))
+		g.sendMsgAll(fmt.Sprintf("Guess '%v' 'is incorrect! The word was %v 😢", guess, g.GuessMe))
 	}
 
 	// reset game state
@@ -422,4 +429,29 @@ func (g *JustOne) handleGuess(cmd *wg.Command) bool {
 func (g *JustOne) String() string {
 	b, _ := json.Marshal(g)
 	return string(b)
+}
+
+func Equalish(word, guess string) bool {
+	word = strings.ToLower(strings.TrimSpace(word))
+	guess = strings.ToLower(strings.TrimSpace(guess))
+
+	if word == guess {
+		return true
+	}
+
+	word = strings.TrimSuffix(word, "s")
+	guess = strings.TrimSuffix(guess, "s")
+
+	if word == guess {
+		return true
+	}
+
+	word = strings.TrimSuffix(word, "e")
+	guess = strings.TrimSuffix(guess, "e")
+
+	if word == guess {
+		return true
+	}
+
+	return false
 }

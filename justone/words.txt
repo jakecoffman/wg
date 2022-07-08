@@ -929,7 +929,7 @@ snow
 soap
 society
 socket
-socks
+sock
 sofa
 software
 soil
@@ -942,9 +942,7 @@ sound
 source
 south
 space
-Spartacus
 speaker
-speakers
 species
 speech
 speed
@@ -975,7 +973,7 @@ store
 story
 strategy
 street
-streetlights
+streetlight
 strength
 stress
 strike
@@ -1042,7 +1040,7 @@ tone
 tony
 toothbrush
 toothpaste
-toothpicks
+toothpick
 top
 total
 touch

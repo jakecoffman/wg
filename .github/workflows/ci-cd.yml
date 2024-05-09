@@ -1,0 +1,38 @@
+name: Build & Test & Deploy
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Build
+      run: go build -v ./... && go build cmd/setgame/setgame.go
+
+    - name: Test
+      run: go test -v ./...
+
+    - name: Deploy
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: stldevs.com
+        username: deploy
+        key: ${{ secrets.KEY }}
+        port: 22
+        source: "setgame"
+        target: "/opt/setgame"
+        strip_components: 1
+        

@@ -33,8 +33,7 @@ jobs:
         key: ${{ secrets.KEY }}
         port: 22
         source: "setgame"
-        target: "/opt/setgame/setgame"
-        strip_components: 1
+        target: "/opt/setgame"
 
     - name: Restart
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -44,4 +43,7 @@ jobs:
         username: deploy
         key: ${{ secrets.KEY }}
         port: 22
-        script: sudo service setgame restart
+        script: |
+          sudo service setgame stop
+          chmod +x /opt/setgame/setgame
+          sudo service setgame start

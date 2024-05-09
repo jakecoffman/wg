@@ -1,8 +1,8 @@
 module github.com/jakecoffman/wg
 
-go 1.18
+go 1.22.3
 
 require (
-	github.com/google/uuid v0.0.0-20171129191014-dec09d789f3d
-	golang.org/x/net v0.17.0
+	github.com/google/uuid v1.6.0
+	golang.org/x/net v0.25.0
 )

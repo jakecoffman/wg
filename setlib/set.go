@@ -28,7 +28,7 @@ type Player struct {
 	Score     int
 	Connected bool `json:",omitempty"`
 	ip        string
-	Ready     bool `json:",omitempty"`
+	Ready     bool   `json:",omitempty"`
 	Name      string `json:",omitempty"`
 }
 
@@ -263,7 +263,7 @@ func (g *Set) noSets(cmd *wg.Command) {
 		g.players[playerId].Score -= len(sets)
 		g.sendAll(&PlayMsg{
 			Type:   "play",
-			Player: g.players[cmd.PlayerId].Id,
+			Player: g.players[cmd.PlayerId],
 			Words:  "missed some",
 			Score:  -len(sets),
 		})
@@ -271,8 +271,8 @@ func (g *Set) noSets(cmd *wg.Command) {
 		g.players[playerId].Score += 1
 		g.sendAll(&PlayMsg{
 			Type:   "play",
-			Player: g.players[cmd.PlayerId].Id,
-			Words: "no sets",
+			Player: g.players[cmd.PlayerId],
+			Words:  "no sets",
 			Score:  1,
 		})
 	}
@@ -321,9 +321,9 @@ func (g *Set) play(cmd *wg.Command) {
 		g.sendMetaToEveryone()
 		g.sendAll(&PlayMsg{
 			Type:   "play",
-			Player: g.players[cmd.PlayerId].Id,
+			Player: g.players[cmd.PlayerId],
 			Cards:  []Card{g.board[play[0]], g.board[play[1]], g.board[play[2]]},
-			Words: "not a set",
+			Words:  "not a set",
 			Score:  -1,
 		})
 		return
@@ -334,7 +334,7 @@ func (g *Set) play(cmd *wg.Command) {
 
 	g.sendAll(&PlayMsg{
 		Type:   "play",
-		Player: g.players[cmd.PlayerId].Id,
+		Player: g.players[cmd.PlayerId],
 		Cards:  []Card{g.board[play[0]], g.board[play[1]], g.board[play[2]]},
 		Score:  1,
 	})
@@ -417,7 +417,7 @@ type MetaMsg struct {
 
 type PlayMsg struct {
 	Type   string
-	Player int
+	Player *Player
 	Cards  []Card
 	Score  int
 	Words  string

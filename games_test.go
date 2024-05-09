@@ -10,7 +10,7 @@ func TestGames(t *testing.T) {
 	}
 
 	game := NewGame(nil, "1")
-	games.Set(game)
+	games.Set(game, "1")
 	maybe := games.Get("1")
 
 	if maybe.Id != game.Id {

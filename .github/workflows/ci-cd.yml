@@ -33,7 +33,7 @@ jobs:
         key: ${{ secrets.KEY }}
         port: 22
         source: "setgame"
-        target: "/opt/setgame"
+        target: "/opt/setgame/setgame"
         strip_components: 1
 
     - name: Restart

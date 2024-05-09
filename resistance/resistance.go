@@ -14,7 +14,7 @@ import (
 )
 
 type Resist struct {
-	*wg.Game
+	*wg.Game[*Resist]
 
 	Players      []*Player
 	playerCursor int
@@ -79,7 +79,7 @@ func NewMissions(slots []int) []*Mission {
 	return missions
 }
 
-func NewGame(id string) *wg.Game {
+func NewGame(id string) *wg.Game[*Resist] {
 	g := &Resist{
 		Players:      []*Player{},
 		playerCursor: 1,

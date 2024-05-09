@@ -1,10 +1,10 @@
 package setlib
 
 import (
-	"testing"
 	"github.com/jakecoffman/wg"
 	"log"
 	"math/rand"
+	"testing"
 	"time"
 )
 
@@ -17,7 +17,7 @@ func TestSet(t *testing.T) {
 	p1Conn := wg.NewFakeConn(player1)
 
 	game := NewGame(gameId)
-	set := game.Class.(*Set)
+	set := game.Class
 
 	game.Cmd <- &wg.Command{player1, p1Conn, cmdJoin, set.Version, nil}
 

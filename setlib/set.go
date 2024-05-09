@@ -12,7 +12,7 @@ import (
 const DEV = false
 
 type Set struct {
-	*wg.Game
+	*wg.Game[*Set]
 
 	board  []Card
 	rands  []int
@@ -32,13 +32,13 @@ type Player struct {
 	Name      string `json:",omitempty"`
 }
 
-func NewGame(id string) *wg.Game {
+func NewGame(id string) *wg.Game[*Set] {
 	g := &Set{
 		players:      map[string]*Player{},
 		playerCursor: 1,
 		board:        []Card{},
 	}
-	g.Game = wg.NewGame(g, id)
+	g.Game = wg.NewGame[*Set](g, id)
 	go g.run()
 	g.reset()
 	return g.Game
@@ -366,7 +366,7 @@ func (g *Set) play(cmd *wg.Command) {
 	g.sendAll(update)
 }
 
-func (g Set) FindSets() [][]int {
+func (g *Set) FindSets() [][]int {
 	var sets [][]int
 	size := len(g.board)
 	var card1, card2, card3 Card

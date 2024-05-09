@@ -1,18 +1,18 @@
 package citadels
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/jakecoffman/wg"
 	"log"
-	"time"
-	"runtime/debug"
 	"math/rand"
-	"encoding/json"
+	"runtime/debug"
 	"sort"
-	"fmt"
+	"time"
 )
 
 type Citadels struct {
-	*wg.Game
+	*wg.Game[*Citadels]
 
 	Players      []*Player
 	playerCursor int
@@ -30,8 +30,8 @@ type Citadels struct {
 
 type ChoosableCharacter struct {
 	*Character
-	Chosen bool    // lets the frontend know that character has been chosen or discarded
-	player *Player // point back to the player that is assigned this round
+	Chosen                 bool    // lets the frontend know that character has been chosen or discarded
+	player                 *Player // point back to the player that is assigned this round
 	HasTaxed, HasSpecialed bool
 }
 
@@ -80,7 +80,7 @@ type Player struct {
 	IsReady bool `json:",omitempty"`
 }
 
-func NewGame(id string) *wg.Game {
+func NewGame(id string) *wg.Game[*Citadels] {
 	c := &Citadels{
 		Players:      []*Player{},
 		playerCursor: 1,

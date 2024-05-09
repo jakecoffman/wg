@@ -32,10 +32,10 @@ type Command struct {
 	Data     json.RawMessage
 }
 
-func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
+func ProcessPlayerCommands[T any](games *Games[T], NewGame func(string) *Game[T]) func(Connector, string) {
 	return func(ws Connector, playerId string) {
 		cmd := &Command{}
-		var game *Game
+		var game *Game[T]
 
 		defer func() {
 			if game != nil {
@@ -53,11 +53,11 @@ func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
 			cmd.PlayerId = playerId
 			switch cmd.Type {
 			case cmdRejoin:
-				game = AllGames.Find(playerId)
+				game = games.Find(playerId)
 				if game == nil {
 					id = GenId()
 					game = NewGame(id)
-					AllGames.Set(game, playerId)
+					games.Set(game, playerId)
 				}
 				cmd.Type = cmdJoin
 				game.Cmd <- cmd
@@ -76,11 +76,11 @@ func ProcessPlayerCommands(NewGame func(string) *Game) func(Connector, string) {
 				if id == "" {
 					id = GenId()
 					game = NewGame(id)
-					AllGames.Set(game, playerId)
-				} else if game = AllGames.Get(id); game == nil {
+					games.Set(game, playerId)
+				} else if game = games.Get(id); game == nil {
 					id = GenId()
 					game = NewGame(id)
-					AllGames.Set(game, playerId)
+					games.Set(game, playerId)
 				}
 				game.Cmd <- cmd
 			case cmdStop:

@@ -15,7 +15,8 @@ func init() {
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	http.Handle("/ws", wg.WsHandler(wg.ProcessPlayerCommands(justone.NewGame)))
+	games := wg.NewGames[*justone.JustOne]()
+	http.Handle("/ws", wg.WsHandler(wg.ProcessPlayerCommands(games, justone.NewGame)))
 	port := "8114"
 	log.Println("Serving http://localhost:" + port)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, nil))

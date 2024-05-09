@@ -16,7 +16,7 @@ func init() {
 }
 
 type JustOne struct {
-	*wg.Game
+	*wg.Game[*JustOne]
 
 	Players      []*Player
 	playerCursor int
@@ -61,7 +61,7 @@ func Find(players []*Player, uuid string) (*Player, int) {
 	return nil, -1
 }
 
-func NewGame(id string) *wg.Game {
+func NewGame(id string) *wg.Game[*JustOne] {
 	g := &JustOne{
 		Players:      []*Player{},
 		playerCursor: 1,

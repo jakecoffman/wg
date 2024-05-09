@@ -3,11 +3,10 @@ package main
 import (
 	"github.com/jakecoffman/wg"
 	"github.com/jakecoffman/wg/resistance"
-	"golang.org/x/net/websocket"
 	"log"
+	"math/rand"
 	"net/http"
 	"time"
-	"math/rand"
 )
 
 func init() {
@@ -16,7 +15,8 @@ func init() {
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	http.Handle("/ws", websocket.Handler(wg.WsHandler(wg.ProcessPlayerCommands(resistance.NewGame))))
+	games := wg.NewGames[*resistance.Resist]()
+	http.Handle("/ws", wg.WsHandler(wg.ProcessPlayerCommands(games, resistance.NewGame)))
 	http.HandleFunc("/.well-known/assetlinks.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[{

@@ -1,15 +1,19 @@
 package wg
 
-import "testing"
+import (
+	"testing"
+)
+
+type FakeGame struct{}
 
 func TestGames(t *testing.T) {
-	games := NewGames()
+	games := NewGames[*FakeGame]()
 
 	if len(games.Ids()) != 0 {
 		t.Error("There shouldn't be any games yet")
 	}
 
-	game := NewGame(nil, "1")
+	game := NewGame[*FakeGame](nil, "1")
 	games.Set(game, "1")
 	maybe := games.Get("1")
 

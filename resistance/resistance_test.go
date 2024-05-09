@@ -19,7 +19,7 @@ func TestResistance(t *testing.T) {
 	p1Conn := wg.NewFakeConn(player1)
 
 	game := NewGame(gameId)
-	resistance := game.Class.(*Resist)
+	resistance := game.Class
 
 	game.Cmd <- &wg.Command{player1, p1Conn, cmdJoin, resistance.Version, nil}
 	game.Cmd <- &wg.Command{player1, p1Conn, cmdAddBot, resistance.Version, nil}
@@ -32,7 +32,7 @@ func TestResistance(t *testing.T) {
 	true := []byte("true")
 
 	var spies, resist int
-	for spies + resist < 1000 {
+	for spies+resist < 1000 {
 	drain:
 		for {
 			select {
@@ -43,7 +43,7 @@ func TestResistance(t *testing.T) {
 		}
 
 		// let the resistance goroutine go, probably should improve this with locking
-		time.Sleep(1*time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 
 		switch resistance.State {
 		case stateTeambuilding:

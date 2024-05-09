@@ -35,4 +35,13 @@ jobs:
         source: "setgame"
         target: "/opt/setgame"
         strip_components: 1
-        
+
+    - name: Restart
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: stldevs.com
+        username: deploy
+        key: ${{ secrets.KEY }}
+        port: 22
+        script: sudo service setgame restart

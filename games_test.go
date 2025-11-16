@@ -34,4 +34,8 @@ func TestGames(t *testing.T) {
 	if len(games.Ids()) != 0 {
 		t.Error("There should be 0 games", games.Ids())
 	}
+
+	if games.Find("1") != nil {
+		t.Error("Player mapping should be removed when game is deleted")
+	}
 }

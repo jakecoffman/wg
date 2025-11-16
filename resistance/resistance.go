@@ -3,14 +3,15 @@ package resistance
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/jakecoffman/wg"
 	"log"
 	"math/rand"
 	"runtime/debug"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jakecoffman/wg"
 )
 
 type Resist struct {
@@ -376,7 +377,6 @@ func (g *Resist) handleStart(cmd *wg.Command) bool {
 		return false
 	}
 
-	g.State = stateTeambuilding
 	g.CurrentMission = 0
 	g.NumFailed = 0
 
@@ -417,6 +417,9 @@ func (g *Resist) handleStart(cmd *wg.Command) bool {
 		}[len(g.Players)]
 		g.Missions = NewMissions(slots)
 	}
+
+	// make the new state visible only after missions are initialized to avoid nil access by readers
+	g.State = stateTeambuilding
 	return true
 }
 

@@ -44,7 +44,7 @@ func NewGames[T any]() *Games[T] {
 			time.Sleep(1 * time.Hour)
 			for _, id := range games.Ids() {
 				game := games.Get(id)
-				if time.Now().Sub(game.Created) > gameCleanup && time.Now().Sub(game.Updated) > gameCleanup {
+				if time.Since(game.Created) > gameCleanup && time.Since(game.Updated) > gameCleanup {
 					game.Cmd <- &Command{Type: cmdStop}
 					games.Delete(id)
 				}
@@ -86,7 +86,7 @@ func (g *Games[T]) Delete(id string) {
 	delete(g.games, id)
 	for pid, game := range g.players {
 		if game.Id == id {
-			defer delete(g.players, pid)
+			delete(g.players, pid)
 		}
 	}
 	g.Unlock()
